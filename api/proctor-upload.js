@@ -1,8 +1,4 @@
 import { upload } from '../backend/src/controllers/proctorController.js'
-import multer from 'multer'
-
-const storage = multer.memoryStorage()
-const multerMiddleware = multer({ storage, limits: { fileSize: 150 * 1024 } })
 
 export const config = { api: { bodyParser: false } }
 
@@ -11,8 +7,9 @@ export default function handler(req, res) {
     res.setHeader('Allow', 'POST')
     return res.status(405).json({ error: 'Use POST.' })
   }
-  multerMiddleware.single('image')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message })
-    return upload(req, res)
-  })
+
+  // Check content type: JSON requests (missed captures) go straight through;
+  // multipart requests (image uploads) also go straight through.
+  // The controller's upload() handles both cases internally with its own multer.
+  return upload(req, res)
 }

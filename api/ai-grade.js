@@ -1,9 +1,9 @@
-import { gradeAssist } from '../backend/src/controllers/aiGradeController.js'
+import { grade } from '../backend/src/controllers/aiGradeController.js'
 
 export default function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
     return res.status(405).json({ error: 'Use POST.' })
   }
-  return gradeAssist(req, res)
+  return grade(req, res)
 }

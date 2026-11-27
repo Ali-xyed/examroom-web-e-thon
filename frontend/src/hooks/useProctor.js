@@ -142,19 +142,29 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
 
   // Forward-declare scheduleNext so it can reference itself in setTimeout
   const scheduleNextRef = useRef(null)
-  const hasCapturedInitial = useRef(false)
+  const captureCount = useRef(0)
 
-  // Schedule next capture: initial capture after 8s so short quizzes are covered, then random 2-6 min
+  // Schedule next capture:
+  //   capture #0: 3s after start (immediate first snap)
+  //   capture #1: 12s after start (second snap)
+  //   capture #2+: random 2-6 min intervals
   const scheduleNext = useCallback((isInitial = false) => {
     if (!enabled || statusRef.current === 'stopped') return
     clearTimeout(captureTimerRef.current)
-    const delay = isInitial && !hasCapturedInitial.current
-      ? 8000
-      : (120 + Math.random() * 240) * 1000 // 2-6 min in ms
+
+    let delay
+    if (isInitial && captureCount.current === 0) {
+      delay = 3000  // first capture at 3s
+    } else if (captureCount.current <= 1) {
+      delay = 12000 // second capture at ~15s total
+    } else {
+      delay = (120 + Math.random() * 240) * 1000 // 2-6 min
+    }
+
     nextCaptureAt.current = Date.now() + delay
     captureTimerRef.current = setTimeout(async () => {
       if (statusRef.current !== 'active') return
-      hasCapturedInitial.current = true
+      captureCount.current++
       const captureId = crypto.randomUUID()
       const frame = await captureFrame()
       const flags = frame?.canvas ? await analyzeFrame(frame.canvas) : ['no_face']
@@ -192,9 +202,9 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
     if (videoRef.current) videoRef.current.srcObject = null
   }, [])
 
-  // Update nextCaptureAt from server heartbeat response (after initial capture is done)
+  // Update nextCaptureAt from server heartbeat response (after initial 2 captures are done)
   const setNextCaptureFromServer = useCallback((serverTimestamp) => {
-    if (!serverTimestamp || !enabled || !hasCapturedInitial.current) return
+    if (!serverTimestamp || !enabled || captureCount.current < 2) return
     const serverTime = new Date(serverTimestamp).getTime()
     if (serverTime > Date.now()) {
       clearTimeout(captureTimerRef.current)
