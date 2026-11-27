@@ -64,7 +64,8 @@ function bindForm(selector, handler) {
   })
 }
 
-function login() {
+function login(message = '') {
+  dashboard = null
   document.body.dataset.view = 'login'
   account.replaceChildren()
   show(`
@@ -82,7 +83,7 @@ function login() {
               <button type="button" id="password-toggle" aria-label="Show password" aria-controls="password"><span aria-hidden="true"></span></button>
             </div>
             <details class="auth-help"><summary>Forgot password?</summary><p>Contact your exam administrator to reset your credentials.</p></details>
-            <p class="form-error" data-error role="alert"></p>
+            <p class="form-error" data-error role="alert">${safe(message)}</p>
             <button class="primary full" type="submit"><span aria-hidden="true">⇥</span> Sign in</button>
           </form>
         </div>
@@ -485,14 +486,14 @@ async function route() {
     document.body.dataset.view = 'workspace'
     brand.href = '/login'
     const { profile } = dashboard
-    if (['sandbox','analytics','import'].includes(view)) { await phaseThree(view,id,{show,safe,notify,profile,take}); return }
-    if (['users','bank','monitor','result'].includes(view)) { await phaseTwo(view,id,{show,safe,notify,profile}); return }
     account.innerHTML = `<div class="account-label"><strong>${safe(profile.name)}</strong>
       <span>${roles[profile.role]}</span></div><button class="secondary" id="logout" type="button">Sign out</button>`
     document.querySelector('#logout').onclick = async () => {
       await signOut()
       navigate()
     }
+    if (['sandbox','analytics','import'].includes(view)) { await phaseThree(view,id,{show,safe,notify,profile,take}); return }
+    if (['users','bank','monitor','result'].includes(view)) { await phaseTwo(view,id,{show,safe,notify,profile}); return }
     if (view === 'create' && profile.role === 'examiner') return create()
     if ((view === 'manage' && profile.role === 'examiner') || (view === 'take' && profile.role === 'candidate')) {
       if (!id || !/^[\da-f-]{36}$/i.test(id)) throw new Error('Exam unavailable.')
@@ -507,11 +508,26 @@ async function route() {
     if (!navigator.onLine && cached && hasSession()) { take(id,{...cached,offline:true}); return }
     if (!hasSession()) login()
     else if (dashboard && view) { await home(); notify(error.message, true) }
-    else show(`<section class="panel empty"><h1>Could not open UnCooked</h1><p>${safe(error.message)}</p>
-      <button class="primary" id="reload" type="button">Try again</button></section>`)
+    else {
+      document.body.dataset.view = 'workspace'
+      show(`<section class="panel empty"><h1>Could not open UnCooked</h1><p>${safe(error.message)}</p>
+        <button class="primary" id="reload" type="button">Try again</button>
+        <button class="secondary" id="switch-account" type="button">Sign in with another account</button></section>`)
+      document.querySelector('#switch-account').onclick = async () => {
+        await signOut()
+        history.replaceState(null, '', '/login')
+        login()
+      }
+    }
     document.querySelector('#reload')?.addEventListener('click', route)
   }
 }
+
+addEventListener('session-ended', event => {
+  routeVersion++
+  history.replaceState(null, '', '/login')
+  login(event.detail)
+})
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && activeAttempt && !activeAttempt.sandbox) examRequest('incident', {examId:activeAttempt.id,event:'page_hidden'}).catch(() => {})
