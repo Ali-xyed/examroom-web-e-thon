@@ -35,6 +35,7 @@ function show(html) {
   activeAttempt = null
   main.innerHTML = html
   main.setAttribute('aria-busy', 'false')
+  window.scrollTo({top: 0, left: 0, behavior: 'instant'})
   main.focus({ preventScroll: true })
 }
 
@@ -160,7 +161,7 @@ async function home() {
         ${candidate && exam.instructions ? '<p class="exam-instructions">' + safe(exam.instructions) + '</p>' : ''}
         <dl class="metadata"><div><dt>Opens</dt><dd>${date(exam.opens_at)}</dd></div>
         <div><dt>Closes</dt><dd>${date(exam.closes_at)}</dd></div>
-        <div><dt>Duration</dt><dd>${exam.duration} min</dd></div></dl></div>${action}${candidate ? `<a class="button secondary" href="#result/${exam.id}">View result</a>` : ''}
+        <div><dt>Duration</dt><dd>${exam.duration} min</dd></div></dl></div><div class="exam-card-actions">${action}${candidate ? `<a class="button secondary" href="#result/${exam.id}">View result</a>` : ''}</div>
       </article>`
     }).join('') : '<p class="panel empty">No examinations to show.</p>'}
     </section>`)

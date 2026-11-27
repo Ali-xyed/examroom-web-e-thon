@@ -13,8 +13,8 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
   if (view === 'users') {
     const users = await examRequest('admin_list')
     show(back + '<h1>User management</h1><div id="editor"></div><div class="panel form-panel">' +
-      users.map(user => `<p><strong>${safe(user.name)}</strong> · ${safe(user.email)} · ${safe(user.role)} · ${user.active ? 'Active' : 'Disabled'}
-      <button class="secondary" data-user="${user.id}">Edit account</button></p>`).join('') + '</div>')
+      '<h2>Accounts</h2>' + users.map(user => `<article class="record-row"><div class="record-copy"><strong>${safe(user.name)}</strong><span class="record-description">${safe(user.email)}</span></div><div class="record-meta"><span class="record-role">${safe(user.role)}</span><span class="pill ${user.active ? 'available' : 'disabled'}">${user.active ? 'Active' : 'Disabled'}</span></div>
+      <button class="secondary" data-user="${user.id}">Edit account</button></article>`).join('') + '</div>')
     function editor(user = {}) {
       document.querySelector('#editor').innerHTML = `<form class="panel form-panel">
       <h2>${user.id ? 'Edit account' : 'Create account'}</h2>
@@ -54,7 +54,7 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
       '<div class="panel form-panel"><label>Filter by topic or difficulty<input id="filter"></label><div id="bank-list"></div></div>')
     function list(filter = '') {
       document.querySelector('#bank-list').innerHTML = bank.filter(q => (q.topic+' '+q.difficulty+' '+q.prompt).toLowerCase().includes(filter.toLowerCase()))
-        .map(q => `<p>${safe(q.prompt)} · ${safe(q.topic)} · ${q.difficulty} · ${q.kind} · ${q.marks} marks <button type="button" class="secondary" data-edit="${q.id}">Edit</button></p>`).join('')
+        .map(q => `<article class="record-row"><div class="record-copy"><strong>${safe(q.prompt)}</strong><span class="record-description">${safe(q.topic)} · ${q.difficulty} · ${q.kind} · ${q.marks} marks</span></div><button type="button" class="secondary" data-edit="${q.id}">Edit</button></article>`).join('') || '<p class="empty-list">No questions match your search.</p>'
       document.querySelectorAll('[data-edit]').forEach(button => editorListener(button, bank.find(q => q.id === button.dataset.edit)))
     }
     function editorListener(button, q) { button.onclick = () => editor(q) }
