@@ -16,19 +16,52 @@ function storeSession(value) {
   else sessionStorage.removeItem(sessionKey)
 }
 
+function friendlyError(message) {
+  if (!message) return 'Something went wrong. Please try again.'
+  if (message === 'No Examroom role is assigned.') return 'No role is assigned to this account.'
+  const rowMatch = message.match(/^Row (\d+):\s*(.+?)\.\s*No records were imported\.$/i)
+  if (rowMatch) {
+    const [, rowNum, detail] = rowMatch
+    if (/users_email|duplicate key/i.test(detail)) {
+      return `Row ${rowNum}: An account with this email already exists. Please use a different email or remove this row. No records were imported.`
+    }
+    return `Row ${rowNum}: ${friendlyError(detail)} No records were imported.`
+  }
+  if (/duplicate key value violates unique constraint/i.test(message)) {
+    return 'A record with this value already exists. Please check for duplicates and try again.'
+  }
+  if (/violates check constraint/i.test(message)) {
+    return 'One or more values are outside the allowed range. Please review your input.'
+  }
+  if (/violates foreign key constraint/i.test(message)) {
+    return 'This item is linked to other records and cannot be changed right now.'
+  }
+  if (/invalid login credentials/i.test(message)) {
+    return 'Incorrect email or password. Please check your credentials and try again.'
+  }
+  return message
+}
+
 async function request(path, body, token) {
   const headers = { apikey: config.key, 'Content-Type': 'application/json' }
   if (token) headers.Authorization = 'Bearer ' + token
-  const response = await fetch(config.url + path, {
-    method: 'POST', headers, body: JSON.stringify(body),
-    signal: AbortSignal.timeout(15000),
-  })
+  let response
+  try {
+    response = await fetch(config.url + path, {
+      method: 'POST', headers, body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000),
+    })
+  } catch (err) {
+    if (err?.name === 'TimeoutError' || /timed out/i.test(err?.message || '')) {
+      throw new Error('The request timed out. Please check your connection and try again.')
+    }
+    throw new Error('Unable to reach the server. Please check your internet connection and try again.')
+  }
   if (response.status === 204) return null
-  const data = await response.json()
+  const data = await response.json().catch(() => ({}))
   if (!response.ok) {
     const message = data.msg || data.message || 'The request failed.'
-    const displayMessage = message === 'No Examroom role is assigned.' ? 'No role is assigned to this account.' : message
-    throw Object.assign(new Error(displayMessage), { status: response.status })
+    throw Object.assign(new Error(friendlyError(message)), { status: response.status })
   }
   return data
 }

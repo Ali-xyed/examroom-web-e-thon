@@ -203,3 +203,72 @@ input[type=file]::file-selector-button { margin-right: .75rem; border: 1px solid
 @media (prefers-reduced-motion: reduce) {
   button, .button, input, textarea, select { transition: none; }
 }
+
+/* Workspace navigation, breadcrumbs, and status indicators (HCI) */
+.workspace-bar { background: #fafaf9; border-bottom: 1px solid var(--line); }
+.workspace-bar-inner { width: min(1080px, 100% - 3rem); margin: 0 auto; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: .35rem 0; }
+.workspace-nav { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.workspace-link { font-size: .85rem; font-weight: 550; color: var(--muted); text-decoration: none; padding: .32rem .7rem; border-radius: 6px; transition: background-color .15s, color .15s; }
+.workspace-link:hover { background: var(--soft); color: var(--ink); }
+.workspace-link.active { background: var(--ink); color: #fff; }
+.workspace-status { display: inline-flex; align-items: center; gap: .45rem; font-size: .8rem; color: var(--muted); font-weight: 500; }
+.conn-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.conn-dot.online { background: #336548; }
+.conn-dot.offline { background: #a62c32; }
+
+.breadcrumb { display: flex; align-items: center; gap: .5rem; font-size: .875rem; color: var(--muted); margin-bottom: 1.25rem; flex-wrap: wrap; }
+.breadcrumb .back { margin-bottom: 0; font-weight: 600; color: var(--ink); }
+
+.status-badge { display: inline-flex; align-items: center; padding: .25rem .65rem; border-radius: 999px; font-size: .78rem; font-weight: 600; background: var(--soft); color: var(--ink); }
+.status-badge.success { background: #edf3ed; color: #336548; }
+.status-badge.warning { background: #fdecc8; color: #6c5228; }
+.status-banner { padding: .85rem 1rem; border-radius: 8px; font-size: .9rem; font-weight: 500; margin-top: 1rem; }
+.status-banner.error { background: #fdebec; color: #a62c32; border: 1px solid #f5c6c9; }
+.status-banner.success { background: #edf3ed; color: #336548; border: 1px solid #c6dfc7; }
+.text-error { color: var(--error); }
+.text-success { color: #336548; }
+
+/* Question Bank Edit Modal */
+.bank-dialog { width: min(680px, calc(100% - 2rem)); }
+#bank-edit-error:not(:empty) { margin: 0 1.5rem 1rem; padding: .75rem; background: #fdebec; border-radius: 6px; font-size: .875rem; }
+
+/* New Examination + Question Bank Drag-and-Drop */
+.create-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(300px, 1fr); gap: 1.25rem; align-items: start; }
+.bank-sidebar { position: sticky; top: 80px; max-height: calc(100svh - 104px); display: flex; flex-direction: column; gap: .85rem; }
+.bank-sidebar-header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.bank-sidebar-header h2 { margin-bottom: .2rem; }
+.bank-sidebar-header p { margin: 0; font-size: .82rem; }
+.bank-sidebar-search { margin-bottom: 0; font-size: .82rem; }
+.bank-sidebar-list { overflow-y: auto; display: grid; gap: .6rem; padding-right: .2rem; max-height: 55svh; }
+.bank-draggable { display: flex; align-items: flex-start; gap: .6rem; padding: .7rem .75rem; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: grab; transition: border-color .15s, box-shadow .15s, opacity .15s; }
+.bank-draggable:hover { border-color: var(--line-strong); box-shadow: 0 2px 8px #0000000a; }
+.bank-draggable.dragging { opacity: .5; cursor: grabbing; }
+.drag-handle { color: var(--muted); font-size: .9rem; line-height: 1.2; user-select: none; padding-top: .1rem; }
+.bank-draggable-copy { flex: 1; min-width: 0; display: grid; gap: .2rem; }
+.bank-draggable-copy strong { font-size: .85rem; line-height: 1.35; overflow-wrap: anywhere; }
+.bank-add-btn { padding: .28rem .55rem; min-height: 30px; font-size: .78rem; flex: none; }
+.dropzone-hint { font-size: .84rem; margin: 1.1rem 0 .5rem; }
+.questions-dropzone { border-radius: 10px; transition: background-color .15s, outline-color .15s; }
+.questions-dropzone.drop-active { outline: 2px dashed var(--ink); outline-offset: 6px; background: #fafaf9; }
+.bank-assigned-card { background: #fafaf9; border-style: dashed; }
+.bank-card-prompt { margin-bottom: .35rem; }
+
+/* Editable JSON Import Preview */
+.import-preview-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .75rem; flex-wrap: wrap; }
+.import-preview-header h2 { margin-bottom: .25rem; }
+.import-preview-header p { margin: 0; font-size: .875rem; }
+.import-records-list { display: grid; gap: .85rem; margin-top: 1rem; }
+.import-record { border: 1px solid var(--line); border-radius: 8px; padding: 1rem; background: #fff; }
+.import-record.has-error { border-color: #e4a3a7; background: #fffafa; }
+.import-record-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .75rem; flex-wrap: wrap; }
+.import-record-head h3 { margin: 0; font-size: .9375rem; }
+.import-record-actions { display: flex; align-items: center; gap: .75rem; }
+.import-edit-fields label { font-size: .82rem; margin-bottom: .65rem; }
+
+@media (max-width: 960px) {
+  .create-grid { grid-template-columns: 1fr; }
+  .bank-sidebar { position: static; max-height: none; }
+}
+@media (max-width: 720px) {
+  .workspace-bar-inner { width: calc(100% - 1.5rem); }
+}

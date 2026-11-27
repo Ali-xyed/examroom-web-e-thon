@@ -17,28 +17,39 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
   }
   if (view === 'bank') {
     const bank = await examRequest('bank')
-    show(back + '<h1>Question bank</h1><div id="bank-editor"></div>' +
-      '<div class="panel form-panel"><label>Filter by topic or difficulty<input id="filter"></label><div id="bank-list"></div></div>')
-    function list(filter = '') {
-      document.querySelector('#bank-list').innerHTML = bank.filter(q => (q.topic+' '+q.difficulty+' '+q.prompt).toLowerCase().includes(filter.toLowerCase()))
-        .map(q => `<article class="record-row"><div class="record-copy"><strong>${safe(q.prompt)}</strong><span class="record-description">${safe(q.topic)} · ${q.difficulty} · ${q.kind} · ${q.marks} marks</span></div><button type="button" class="secondary" data-edit="${q.id}">Edit</button></article>`).join('') || '<p class="empty-list">No questions match your search.</p>'
-      document.querySelectorAll('[data-edit]').forEach(button => editorListener(button, bank.find(q => q.id === button.dataset.edit)))
-    }
-    function editorListener(button, q) { button.onclick = () => editor(q) }
-    function editor(q = {}) {
-      document.querySelector('#bank-editor').innerHTML = `<form class="panel form-panel"><h2>${q.id ? 'Edit question' : 'New question'}</h2>
-        <label>Question<textarea name="prompt" required maxlength="2000">${safe(q.prompt)}</textarea></label>
+    show(`<nav class="breadcrumb" aria-label="Breadcrumb"><a class="back" href="#">← Back to Examinations</a><span aria-hidden="true">/</span><span>Question bank</span></nav>
+      <div class="heading"><div><h1>Question bank</h1><p>Create reusable questions and organize them by topic and difficulty.</p></div>
+        <span class="status-badge" role="status">${bank.length} ${bank.length === 1 ? 'question' : 'questions'} in bank</span></div>
+      <div id="bank-editor"></div>
+      <div class="panel form-panel"><label>Filter by topic, difficulty, or question text<input id="filter" type="search" placeholder="Search questions…"></label><div id="bank-list"></div></div>
+      <dialog class="account-dialog bank-dialog" id="bank-edit-dialog" aria-labelledby="bank-edit-title">
+        <div class="account-dialog-heading">
+          <div><h2 id="bank-edit-title">Edit question</h2><p id="bank-edit-subtitle">Update the question details and save your changes.</p></div>
+          <button class="account-close secondary" type="button" id="close-bank-edit" aria-label="Close edit question dialog">×</button>
+        </div>
+        <form id="bank-edit-form">
+          <div class="account-fields" id="bank-edit-fields"></div>
+          <p id="bank-edit-error" class="form-error" role="alert"></p>
+          <div class="account-footer">
+            <button class="secondary" id="cancel-bank-edit" type="button">Cancel</button>
+            <button class="primary" id="save-bank-edit" type="submit">Save changes</button>
+          </div>
+        </form>
+      </dialog>`)
+
+    function questionFormFields(q = {}) {
+      return `<label>Question<textarea name="prompt" required maxlength="2000">${safe(q.prompt)}</textarea></label>
         <div class="fields"><label>Type<select name="kind">${[['single','Single-answer MCQ'],['multiple','Multiple-select MCQ'],['written','Written response']].map(([kind,label]) => `<option value="${kind}" ${q.kind===kind?'selected':''}>${label}</option>`).join('')}</select></label>
         <label>Topic<input name="topic" required maxlength="100" value="${safe(q.topic || 'General')}"></label>
         <label>Difficulty<select name="difficulty">${['easy','medium','hard'].map(d => `<option ${q.difficulty===d?'selected':''}>${d}</option>`).join('')}</select></label>
         <label>Marks<input name="marks" type="number" min="1" max="100" value="${q.marks || 1}" required></label></div>
-        <p class="muted" id="marking-help"></p>
+        <p class="muted" data-marking-help></p>
         <fieldset data-question-types="single multiple"><legend>Answer choices</legend><div class="fields">${['A','B','C','D'].map((letter,i) => `<label>Choice ${letter}<input name="choice" maxlength="500" value="${safe(q.kind === 'written' ? '' : q.choices?.[i] || '')}"></label>`).join('')}</div></fieldset>
         <label data-question-types="single">Correct answer<select name="correct">${['A','B','C','D'].map((letter,i) => `<option value="${i}" ${q.correct===i?'selected':''}>${letter}</option>`).join('')}</select></label>
-        <fieldset data-question-types="multiple"><legend>Correct answers</legend>${['A','B','C','D'].map((letter,i) => `<label class="flag"><input type="checkbox" name="correctSet" value="${i}" ${q.correct_set?.includes(i)?'checked':''}>${letter}</label>`).join('')}</fieldset>
-        <button class="primary">Save question</button> <button class="secondary" type="button" id="new-bank">New question</button></form>`
-      document.querySelector('#new-bank').onclick = () => editor()
-      const form = document.querySelector('#bank-editor form')
+        <fieldset data-question-types="multiple"><legend>Correct answers</legend>${['A','B','C','D'].map((letter,i) => `<label class="flag"><input type="checkbox" name="correctSet" value="${i}" ${q.correct_set?.includes(i)?'checked':''}>${letter}</label>`).join('')}</fieldset>`
+    }
+
+    function bindQuestionForm(form, q, onSubmit) {
       const type = form.elements.kind
       const correctChoices = [...form.querySelectorAll('[name="correctSet"]')]
       function validateCorrectChoices() {
@@ -54,7 +65,7 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
             input.required = visible && input.name === 'choice'
           }
         }
-        document.querySelector('#marking-help').textContent = {
+        form.querySelector('[data-marking-help]').textContent = {
           single: 'Enter four choices and select one correct answer.',
           multiple: 'Enter four choices and select the correct answers. Candidates must select exactly those answers for full marks.',
           written: 'Candidates enter a written response. The examiner grades it up to the assigned marks.',
@@ -64,24 +75,104 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
       type.onchange = updateQuestionType
       correctChoices.forEach(input => input.onchange = validateCorrectChoices)
       updateQuestionType()
-      document.querySelector('#bank-editor form').onsubmit = async event => {
+      form.onsubmit = async event => {
         event.preventDefault()
         const data = new FormData(event.currentTarget)
         const payload = Object.fromEntries(data)
-        payload.id=q.id
+        payload.id = q.id
         payload.choices = payload.kind === 'written' ? ['Unused 0','Unused 1','Unused 2','Unused 3'] : data.getAll('choice')
         payload.correct = payload.kind === 'single' ? Number(data.get('correct')) : 0
         payload.correctSet = payload.kind === 'multiple' ? data.getAll('correctSet').map(Number) : []
-        await action('bank_save',payload,()=>phaseTwo(view,id,{show,safe,notify,profile}))
+        await onSubmit(payload)
       }
     }
-    editor(); list()
+
+    function renderNewForm() {
+      document.querySelector('#bank-editor').innerHTML = `<form class="panel form-panel"><h2>New question</h2>
+        ${questionFormFields()}
+        <div class="form-actions"><button class="primary" type="submit">Save question</button><button class="secondary" type="button" id="reset-bank">Clear form</button></div></form>`
+      const form = document.querySelector('#bank-editor form')
+      document.querySelector('#reset-bank').onclick = () => renderNewForm()
+      bindQuestionForm(form, {}, async payload => {
+        const btn = form.querySelector('button[type="submit"]')
+        btn.disabled = true
+        btn.textContent = 'Saving…'
+        try {
+          await examRequest('bank_save', payload)
+          notify('Question added to bank.')
+          await phaseTwo(view, id, {show, safe, notify, profile})
+        } catch (error) {
+          notify(error.message, true)
+          btn.disabled = false
+          btn.textContent = 'Save question'
+        }
+      })
+    }
+
+    const editDialog = document.querySelector('#bank-edit-dialog')
+    const editForm = document.querySelector('#bank-edit-form')
+    const editFields = document.querySelector('#bank-edit-fields')
+    const editError = document.querySelector('#bank-edit-error')
+    const saveEditBtn = document.querySelector('#save-bank-edit')
+    let editBusy = false
+    let editOpener = null
+
+    function closeEditDialog() {
+      if (editBusy) return
+      editDialog.close()
+      editForm.reset()
+      editFields.replaceChildren()
+      editError.textContent = ''
+      if (editOpener?.isConnected) editOpener.focus({preventScroll: true})
+    }
+    editDialog.addEventListener('cancel', event => { event.preventDefault(); closeEditDialog() })
+    document.querySelector('#close-bank-edit').onclick = closeEditDialog
+    document.querySelector('#cancel-bank-edit').onclick = closeEditDialog
+
+    function openEditModal(q, trigger) {
+      editOpener = trigger
+      editError.textContent = ''
+      document.querySelector('#bank-edit-subtitle').textContent = `${q.topic || 'General'} · ${q.difficulty || 'easy'} · ${q.marks || 1} marks`
+      editFields.innerHTML = questionFormFields(q)
+      bindQuestionForm(editForm, q, async payload => {
+        if (editBusy) return
+        editBusy = true
+        saveEditBtn.textContent = 'Saving…'
+        editDialog.querySelectorAll('button, input, select, textarea').forEach(el => { el.disabled = true })
+        try {
+          await examRequest('bank_save', payload)
+          editBusy = false
+          closeEditDialog()
+          notify('Question updated.')
+          await phaseTwo(view, id, {show, safe, notify, profile})
+        } catch (error) {
+          editError.textContent = error.message
+        } finally {
+          editBusy = false
+          editDialog.querySelectorAll('button, input, select, textarea').forEach(el => { el.disabled = false })
+          saveEditBtn.textContent = 'Save changes'
+        }
+      })
+      editDialog.showModal()
+      editForm.elements.prompt.focus()
+    }
+
+    function list(filter = '') {
+      document.querySelector('#bank-list').innerHTML = bank.filter(q => (q.topic+' '+q.difficulty+' '+q.prompt).toLowerCase().includes(filter.toLowerCase()))
+        .map(q => `<article class="record-row"><div class="record-copy"><strong>${safe(q.prompt)}</strong><span class="record-description">${safe(q.topic)} · ${q.difficulty} · ${q.kind} · ${q.marks} marks</span></div><button type="button" class="secondary" data-edit="${q.id}">Edit</button></article>`).join('') || '<p class="empty-list">No questions match your search.</p>'
+      document.querySelectorAll('[data-edit]').forEach(button => {
+        button.onclick = () => openEditModal(bank.find(q => q.id === button.dataset.edit), button)
+      })
+    }
+
+    renderNewForm(); list()
     document.querySelector('#filter').oninput = event => list(event.target.value)
     return true
   }
   if (view === 'monitor') {
     const data = await examRequest('monitor',{examId:id})
-    show(back + `<h1>Monitor and grade</h1><p>Incidents are signals for review. They do not establish misconduct.</p>
+    show(`<nav class="breadcrumb" aria-label="Breadcrumb"><a class="back" href="#manage/${id}">← Back to Manage exam</a><span aria-hidden="true">/</span><span>Monitor and grade</span></nav>
+      <h1>Monitor and grade</h1><p>Incidents are signals for review. They do not establish misconduct.</p>
       <button class="secondary" id="refresh-monitor">Refresh progress</button><p class="muted">Refresh to load the latest answers, incidents, and expired submissions.</p>
       <form class="panel form-panel" id="announce"><label>Announcement<textarea name="message" required maxlength="2000"></textarea></label><button class="primary">Send announcement</button></form>
       <section class="panel form-panel"><h2>Results</h2><p>${data.scores.length} submitted attempts · Average score ${data.scores.length ? (data.scores.reduce((s,r)=>s+Number(r.score),0)/data.scores.length).toFixed(2) : '—'}</p>
@@ -108,7 +199,7 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
   }
   if (view === 'result') {
     const result=await examRequest('result',{examId:id})
-    show(back+'<section class="panel form-panel"><h1>Your result</h1>'+
+    show(`<nav class="breadcrumb" aria-label="Breadcrumb"><a class="back" href="#">← Back to My examinations</a><span aria-hidden="true">/</span><span>Result</span></nav><section class="panel form-panel"><h1>Your result</h1>`+
       (result.published ? result.scores.map(s=>`<p>Score <strong>${s.score} / ${s.total}</strong></p>`).join('') || '<p>No submitted attempt.</p>' : '<p>Your examiner has not published results yet.</p>')+
       (result.published && result.scores.length ? '<button class="primary" id="report">Download verified PDF report</button><p id="report-verification"></p>' : '')+'</section>')
     const reportButton=document.querySelector('#report')

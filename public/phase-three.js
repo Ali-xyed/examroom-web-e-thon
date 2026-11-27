@@ -26,7 +26,7 @@ export async function phaseThree(view,id,{show,safe,notify,profile,take}) {
   }
   if(view==='analytics') {
     const rows=await examRequest('analytics',{examId:id})
-    show('<a class="back" href="#manage/'+id+'">Manage exam</a><h1>Question analytics</h1>'+
+    show('<nav class="breadcrumb" aria-label="Breadcrumb"><a class="back" href="#manage/'+id+'">← Back to Manage exam</a><span aria-hidden="true">/</span><span>Question analytics</span></nav><h1>Question analytics</h1>'+
       rows.map(q=>'<section class="panel form-panel"><h2>'+safe(q.prompt)+'</h2><p>'+q.attempts+' submitted attempts · '+q.skipped+' skipped · '+q.incorrect+' incorrect objective responses</p>'+(q.average_written_mark!==null?'<p>Average written mark '+Number(q.average_written_mark).toFixed(2)+' / '+q.marks+'</p>':'')+'</section>').join(''))
     return true
   }
@@ -34,7 +34,7 @@ export async function phaseThree(view,id,{show,safe,notify,profile,take}) {
     const administrator=profile.role==='administrator'
     const sample=administrator ? [{name:'Example Candidate',email:'candidate2@example.com',password:'Choose-a-unique-password'}] :
       [{prompt:'Which number is prime?',kind:'single',choices:['4','7','8','9'],correct:1,correctSet:[],marks:1,topic:'Mathematics',difficulty:'easy'}]
-    show('<a class="back" href="#">Examinations</a><h1>Bulk import</h1><section class="panel form-panel"><p>'+
+    show('<nav class="breadcrumb" aria-label="Breadcrumb"><a class="back" href="#">← Back to Examinations</a><span aria-hidden="true">/</span><span>Bulk import</span></nav><h1>Bulk import</h1><section class="panel form-panel"><p>'+
       (administrator?'Import candidate accounts. Each record needs a name, email, and password of at least 12 characters.':'Import question-bank records. Use single, multiple, or written for kind. Multiple-select requires correctSet indexes from 0 to 3.')+
       '</p><p>Upload a JSON array with up to 200 records. Review the preview, then confirm the import.</p><button class="secondary" id="sample">Download sample JSON</button><form id="import-form"><label>JSON file<input type="file" accept=".json,application/json" required id="import-file"></label><section id="import-preview" aria-live="polite"></section><button class="primary" id="confirm-import" disabled>Confirm import</button><p id="import-status" role="status"></p></form></section>')
     document.querySelector('#sample').onclick=()=>{

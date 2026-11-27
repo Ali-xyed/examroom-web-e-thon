@@ -6,7 +6,7 @@ export async function manageUsers({show, safe, notify}) {
   const pageSize = 12
   let busy = false
   let opener
-  show(`<a class="back" href="#">Examinations</a>
+  show(`<nav class="breadcrumb" aria-label="Breadcrumb"><a class="back" href="#">← Back to Examinations</a><span aria-hidden="true">/</span><span>User management</span></nav>
     <div class="heading"><div><h1>User management</h1><p>Manage account access and permissions.</p></div>
       <button class="primary" id="create-user" type="button">＋ Create account</button></div>
     <section class="panel users-panel" aria-label="Accounts">

@@ -167,14 +167,23 @@ async function home() {
     </section>`)
 }
 
-function questionFields(index) {
-  return `<fieldset class="panel question-fields"><legend>Question ${index + 1}</legend>
-    <label>Question text<textarea name="prompt" required maxlength="2000" rows="2"></textarea></label>
+function questionFields(index, q = {}) {
+  const choices = Array.isArray(q.choices) ? q.choices : []
+  return `<fieldset class="panel question-fields" data-inline-question><legend>Question ${index + 1}</legend>
+    <label>Question text<textarea name="prompt" required maxlength="2000" rows="2">${safe(q.prompt || '')}</textarea></label>
     <div class="fields">
-      ${['A', 'B', 'C', 'D'].map(letter => `<label>Choice ${letter}<input name="choice" required maxlength="500"></label>`).join('')}
-      <label>Correct choice<select name="correct">${['A','B','C','D'].map((letter, i) => `<option value="${i}">${letter}</option>`).join('')}</select></label>
-      <label>Marks<input name="marks" type="number" required min="1" max="100" value="1"></label>
+      ${['A', 'B', 'C', 'D'].map((letter, i) => `<label>Choice ${letter}<input name="choice" required maxlength="500" value="${safe(choices[i] || '')}"></label>`).join('')}
+      <label>Correct choice<select name="correct">${['A','B','C','D'].map((letter, i) => `<option value="${i}" ${Number(q.correct) === i ? 'selected' : ''}>${letter}</option>`).join('')}</select></label>
+      <label>Marks<input name="marks" type="number" required min="1" max="100" value="${q.marks || 1}"></label>
     </div>
+    <button class="link-button remove-question" type="button">Remove question</button>
+  </fieldset>`
+}
+
+function bankQuestionCard(index, q) {
+  return `<fieldset class="panel question-fields bank-assigned-card" data-bank-id="${safe(q.id)}"><legend>Question ${index + 1} · From bank (${safe(q.kind)})</legend>
+    <p class="bank-card-prompt"><strong>${safe(q.prompt)}</strong></p>
+    <p class="muted">${safe(q.topic || 'General')} · ${safe(q.difficulty || 'easy')} · ${q.marks || 1} marks</p>
     <button class="link-button remove-question" type="button">Remove question</button>
   </fieldset>`
 }
@@ -184,33 +193,121 @@ function inputDate(value) {
   return local.toISOString().slice(0, 16)
 }
 
-function create() {
+async function create() {
   const now = Date.parse(dashboard.serverTime)
-  show(`<a class="back" href="#">Examinations</a>
-    ${pageHeader('New examination', 'Add the schedule, instructions, and questions before you publish.')}
-    <form id="create">
-      <section class="panel form-panel"><h2>Exam details</h2>
-        <label>Title<input name="title" required maxlength="150"></label>
-        <label>Candidate instructions<textarea name="instructions" maxlength="5000" rows="3"></textarea></label>
-        <div class="fields">
-          <label>Opens at<input type="datetime-local" name="opensAt" required value="${inputDate(new Date(now))}"></label>
-          <label>Closes at<input type="datetime-local" name="closesAt" required value="${inputDate(new Date(now + 3600000))}"></label>
-          <label>Duration in minutes<input name="duration" type="number" min="1" max="480" value="30" required></label>
+  let bank = []
+  try { bank = await examRequest('bank') } catch { bank = [] }
+  show(`<nav class="breadcrumb" aria-label="Breadcrumb"><a class="back" href="#">← Back to Examinations</a><span aria-hidden="true">/</span><span>New examination</span></nav>
+    ${pageHeader('New examination', 'Add the schedule, instructions, and questions — or drag questions from your Question Bank.')}
+    <div class="create-grid">
+      <form id="create">
+        <section class="panel form-panel"><h2>Exam details</h2>
+          <label>Title<input name="title" required maxlength="150"></label>
+          <label>Candidate instructions<textarea name="instructions" maxlength="5000" rows="3"></textarea></label>
+          <div class="fields">
+            <label>Opens at<input type="datetime-local" name="opensAt" required value="${inputDate(new Date(now))}"></label>
+            <label>Closes at<input type="datetime-local" name="closesAt" required value="${inputDate(new Date(now + 3600000))}"></label>
+            <label>Duration in minutes<input name="duration" type="number" min="1" max="480" value="30" required></label>
+          </div>
+        </section>
+        <div class="dropzone-hint muted" id="dropzone-hint">Drag questions from the Question Bank panel and drop them below, or add a blank question.</div>
+        <div id="questions" class="questions-dropzone">${questionFields(0)}</div>
+        <div class="form-actions"><button type="button" class="secondary" id="add-question">Add blank question</button>
+          <p class="form-error" role="alert" data-error></p><button type="submit" class="primary">Save draft</button></div>
+      </form>
+      <aside class="panel form-panel bank-sidebar" aria-label="Question bank">
+        <div class="bank-sidebar-header">
+          <div><h2>Question bank</h2><p class="muted">Drag &amp; drop into the exam</p></div>
+          <span class="status-badge">${bank.length}</span>
         </div>
-      </section>
-      <div id="questions">${questionFields(0)}</div>
-      <div class="form-actions"><button type="button" class="secondary" id="add-question">Add question</button>
-        <p class="form-error" role="alert" data-error></p><button type="submit" class="primary">Save draft</button></div>
-    </form>`)
+        <label class="bank-sidebar-search">Filter questions<input id="bank-sidebar-filter" type="search" placeholder="Search topic, difficulty, text…"></label>
+        <div id="bank-sidebar-list" class="bank-sidebar-list"></div>
+      </aside>
+    </div>`)
   const questions = document.querySelector('#questions')
+  const sidebarList = document.querySelector('#bank-sidebar-list')
+  const sidebarFilter = document.querySelector('#bank-sidebar-filter')
+
   function renumber() {
     const fields = [...questions.children]
     fields.forEach((field, index) => {
-      field.querySelector('legend').textContent = 'Question ' + (index + 1)
-      field.querySelector('button').disabled = fields.length === 1
+      const bankKind = field.dataset.bankId ? ' · From bank' : ''
+      field.querySelector('legend').textContent = 'Question ' + (index + 1) + bankKind
+      field.querySelector('.remove-question').disabled = fields.length === 1
     })
     document.querySelector('#add-question').disabled = fields.length >= 50
   }
+
+  function isBlankStarter(field) {
+    if (!field || !field.hasAttribute('data-inline-question')) return false
+    const prompt = field.querySelector('[name="prompt"]')?.value.trim()
+    const choices = [...field.querySelectorAll('[name="choice"]')].map(el => el.value.trim())
+    return !prompt && choices.every(c => !c)
+  }
+
+  function appendBankQuestion(bankId) {
+    const q = bank.find(item => item.id === bankId)
+    if (!q) return
+    if (questions.children.length >= 50) {
+      notify('An examination can have at most 50 questions.', true)
+      return
+    }
+    if (questions.children.length === 1 && isBlankStarter(questions.firstElementChild)) {
+      questions.firstElementChild.remove()
+    }
+    const html = q.kind === 'single' ? questionFields(questions.children.length, q) : bankQuestionCard(questions.children.length, q)
+    questions.insertAdjacentHTML('beforeend', html)
+    renumber()
+    notify('Added question from bank.')
+  }
+
+  function renderBankSidebar(term = '') {
+    const needle = term.trim().toLowerCase()
+    const filtered = bank.filter(q => (q.topic + ' ' + q.difficulty + ' ' + q.prompt).toLowerCase().includes(needle))
+    sidebarList.innerHTML = filtered.length
+      ? filtered.map(q => `<article class="bank-draggable" draggable="true" data-bank-item="${safe(q.id)}">
+          <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+          <div class="bank-draggable-copy">
+            <strong>${safe(q.prompt)}</strong>
+            <span class="record-description">${safe(q.topic)} · ${safe(q.difficulty)} · ${safe(q.kind)} · ${q.marks}m</span>
+          </div>
+          <button type="button" class="secondary bank-add-btn" data-add-bank="${safe(q.id)}" aria-label="Add question to exam">＋ Add</button>
+        </article>`).join('')
+      : `<p class="empty-list">${bank.length ? 'No matching questions.' : 'No questions in Question Bank yet. <a href="#bank">Create some first</a>.'}</p>`
+  }
+
+  sidebarList.addEventListener('dragstart', event => {
+    const item = event.target.closest('[data-bank-item]')
+    if (!item) return
+    event.dataTransfer.setData('text/plain', item.dataset.bankItem)
+    event.dataTransfer.effectAllowed = 'copy'
+    item.classList.add('dragging')
+  })
+  sidebarList.addEventListener('dragend', event => {
+    event.target.closest('[data-bank-item]')?.classList.remove('dragging')
+    questions.classList.remove('drop-active')
+  })
+  sidebarList.addEventListener('click', event => {
+    const btn = event.target.closest('[data-add-bank]')
+    if (btn) appendBankQuestion(btn.dataset.addBank)
+  })
+  sidebarFilter.oninput = event => renderBankSidebar(event.target.value)
+
+  questions.addEventListener('dragover', event => {
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'copy'
+    questions.classList.add('drop-active')
+  })
+  questions.addEventListener('dragleave', event => {
+    if (!questions.contains(event.relatedTarget)) questions.classList.remove('drop-active')
+  })
+  questions.addEventListener('drop', event => {
+    event.preventDefault()
+    questions.classList.remove('drop-active')
+    const bankId = event.dataTransfer.getData('text/plain')
+    if (bankId) appendBankQuestion(bankId)
+  })
+
   document.querySelector('#add-question').onclick = () => {
     questions.insertAdjacentHTML('beforeend', questionFields(questions.children.length))
     renumber()
@@ -223,21 +320,31 @@ function create() {
     renumber()
     document.querySelector('#add-question').focus()
   }
+  renderBankSidebar()
   renumber()
   bindForm('#create', async data => {
     const opensAt = new Date(data.get('opensAt'))
     const closesAt = new Date(data.get('closesAt'))
     if (closesAt <= opensAt) throw new Error('Closing time must be after opening time.')
-    const choices = data.getAll('choice')
-    const correct = data.getAll('correct')
-    const marks = data.getAll('marks')
+    const inlineCards = [...questions.querySelectorAll('[data-inline-question]')]
+    const bankCards = [...questions.querySelectorAll('[data-bank-id]')]
+    if (!inlineCards.length) {
+      throw new Error('Include at least one single-answer question before saving the draft.')
+    }
+    const inlineQuestions = inlineCards.map(card => ({
+      prompt: card.querySelector('[name="prompt"]').value,
+      choices: [...card.querySelectorAll('[name="choice"]')].map(el => el.value),
+      correct: Number(card.querySelector('[name="correct"]').value),
+      marks: Number(card.querySelector('[name="marks"]').value),
+    }))
     const result = await examRequest('create', {
       title: data.get('title'), instructions: data.get('instructions'), duration: Number(data.get('duration')),
       opensAt: opensAt.toISOString(), closesAt: closesAt.toISOString(),
-      questions: data.getAll('prompt').map((prompt, index) => ({
-        prompt, choices: choices.slice(index * 4, index * 4 + 4), correct: Number(correct[index]), marks: Number(marks[index]),
-      })),
+      questions: inlineQuestions,
     })
+    for (const card of bankCards) {
+      await examRequest('assign', { examId: result.id, questionId: card.dataset.bankId })
+    }
     notify('Draft saved.')
     navigate('manage/' + result.id)
   })
@@ -245,7 +352,7 @@ function create() {
 
 function manage(id, data) {
   const { exam, candidates, questions } = data
-  show(`<a class="back" href="#">Examinations</a>
+  show(`<nav class="breadcrumb" aria-label="Breadcrumb"><a class="back" href="#">← Back to Examinations</a><span aria-hidden="true">/</span><span>${safe(exam.title)}</span></nav>
     ${pageHeader(exam.title, exam.published ? 'Published examination' : 'Draft examination',
       exam.published ? '' : '<button id="publish" class="primary" type="button">Publish exam</button>')}
     <div class="manage-grid"><section class="panel form-panel">
@@ -283,7 +390,7 @@ function manage(id, data) {
 }
 
 function receipt(exam, submittedAt) {
-  show(`<a class="back" href="#">My examinations</a><section class="panel receipt">
+  show(`<nav class="breadcrumb" aria-label="Breadcrumb"><a class="back" href="#">← Back to My examinations</a><span aria-hidden="true">/</span><span>Submission receipt</span></nav><section class="panel receipt">
     <span class="receipt-icon" aria-hidden="true">✓</span><h1>Attempt submitted</h1>
     <p>${safe(exam.title)}</p><p class="muted">Submission recorded at ${date(submittedAt)}.</p>
     <a class="button secondary" href="#">Back to examinations</a></section>`)
@@ -302,7 +409,7 @@ function take(id, data) {
   const state = { id, sandbox, chain: Promise.resolve(), unsaved: new Map(), submitting: false, index: 0 }
   let remaining = Date.parse(data.deadline) - Date.parse(data.serverTime) - (data.offline ? Math.max(0,Date.now()-data.cachedAt) : 0)
   let synchronizedAt = performance.now()
-  show(`<a class="back" href="#">My examinations</a>
+  show(`<nav class="breadcrumb" aria-label="Breadcrumb"><a class="back" href="${sandbox ? '#manage/' + id : '#'}">← ${sandbox ? 'Back to Manage exam' : 'Back to My examinations'}</a><span aria-hidden="true">/</span><span>${safe(exam.title)}</span></nav>
     ${sandbox ? '<p class="pill">Examiner sandbox · Practice answers are local to this preview</p>' : ''}
     ${pageHeader(exam.title, exam.instructions || 'Answer the questions and submit before time expires.',
       '<div class="timer"><span>Time remaining</span><strong id="clock">--:--</strong></div>')}
@@ -474,13 +581,44 @@ function take(id, data) {
   timer = setInterval(tick, 1000)
 }
 
+function renderWorkspaceBar(profile, view) {
+  let bar = document.querySelector('#workspace-bar')
+  if (!bar) {
+    document.querySelector('.top')?.insertAdjacentHTML('afterend', '<div id="workspace-bar" class="workspace-bar"></div>')
+    bar = document.querySelector('#workspace-bar')
+  }
+  const navItems = profile.role === 'examiner'
+    ? [['', 'Examinations'], ['bank', 'Question bank'], ['create', 'New examination'], ['import', 'Bulk import']]
+    : profile.role === 'administrator'
+      ? [['', 'Overview'], ['users', 'Manage users'], ['import', 'Bulk import']]
+      : [['', 'My examinations']]
+  const activeView = view || ''
+  const online = navigator.onLine
+  bar.innerHTML = `<div class="workspace-bar-inner">
+    <nav class="workspace-nav" aria-label="Workspace navigation">
+      ${navItems.map(([href, label]) => {
+        const isCurrent = activeView === href || (href === '' && ['manage', 'monitor', 'analytics', 'result', 'take', 'sandbox'].includes(activeView))
+        return `<a href="#${href}" class="workspace-link ${isCurrent ? 'active' : ''}" ${isCurrent ? 'aria-current="page"' : ''}>${label}</a>`
+      }).join('')}
+    </nav>
+    <div class="workspace-status" role="status" aria-live="polite">
+      <span class="conn-dot ${online ? 'online' : 'offline'}" aria-hidden="true"></span>
+      <span>${online ? 'Connected' : 'Offline'}</span>
+    </div>
+  </div>`
+}
+
 let routeVersion = 0
 async function route() {
   const version = ++routeVersion
-  if (!hasSession()) return login()
+  if (!hasSession()) {
+    document.querySelector('#workspace-bar')?.remove()
+    return login()
+  }
   const { view, id } = currentRoute()
   const operations = { manage: 'manage', take: 'start' }
   try {
+    main.setAttribute('aria-busy', 'true')
     const info = await examRequest('dashboard')
     if (version !== routeVersion) return
     dashboard = info
@@ -493,6 +631,7 @@ async function route() {
       await signOut()
       navigate()
     }
+    renderWorkspaceBar(profile, view)
     if (['sandbox','analytics','import'].includes(view)) { await phaseThree(view,id,{show,safe,notify,profile,take}); return }
     if (['users','bank','monitor','result'].includes(view)) { await phaseTwo(view,id,{show,safe,notify,profile}); return }
     if (view === 'create' && profile.role === 'examiner') return create()
@@ -546,5 +685,14 @@ if (verificationCode) {
   addEventListener('hashchange', route)
   void route()
 }
+
+function updateConnectionStatus() {
+  const status = document.querySelector('#workspace-bar .workspace-status')
+  if (!status) return
+  const online = navigator.onLine
+  status.innerHTML = `<span class="conn-dot ${online ? 'online' : 'offline'}" aria-hidden="true"></span><span>${online ? 'Connected' : 'Offline'}</span>`
+}
+addEventListener('online', updateConnectionStatus)
+addEventListener('offline', updateConnectionStatus)
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})
