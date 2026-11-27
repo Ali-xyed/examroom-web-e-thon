@@ -2,7 +2,7 @@ import { candidateDirectory } from './candidate-directory.js'
 import { examRequest, hasSession, signIn, signOut } from './api.js'
 import { phaseThree, verification, downloadReport, workspaceTools, readLocal, writeLocal, removeLocal } from './phase-three.js'
 import { phaseTwo, examTools } from './phase-two.js'
-import { authPanel, landing, landingNav } from './site.js'
+import { authPanel, landing, landingNav, initLandingEffects } from './site.js'
 
 const main = document.querySelector('#main')
 const account = document.querySelector('#account')
@@ -113,6 +113,7 @@ function showLanding() {
     ? '<a class="button primary" href="/login">Open workspace</a>'
     : '<a class="button primary" href="/login">Log in</a>'
   show(landing())
+  initLandingEffects()
   const tabs = [...main.querySelectorAll('[data-preview]')]
   const panels = [...main.querySelectorAll('[data-preview-panel]')]
   tabs.forEach(button => button.onclick = () => {
