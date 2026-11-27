@@ -63,25 +63,27 @@ function login() {
   account.replaceChildren()
   show(`
     <section class="entry">
-      <div class="intro">
-        <div class="entry-label"><span></span> Online examination platform</div>
-        <h1>Take your<br>seat<span class="accent">.</span></h1>
-        <p>Sign in to create, manage, or take an examination.</p>
-        <div class="illustration" aria-hidden="true">
-          <div class="paper paper-back"></div>
-          <div class="paper paper-front"><div class="paper-title"></div><i></i><i></i><i></i><div class="paper-mark">✓</div></div>
+      <div class="login">
+        <div class="login-content">
+          <h1>Sign in</h1>
+          <p class="muted">Use the credentials provided for your role.</p>
+          <form id="login">
+            <label>Email address<input type="email" name="email" autocomplete="username" required></label>
+            <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+            <p class="form-error" data-error role="alert"></p>
+            <button class="primary full" type="submit">Sign in</button>
+          </form>
         </div>
       </div>
-      <div class="panel login">
-        <h2>Sign in</h2>
-        <p class="muted">Use the credentials provided for your role.</p>
-        <form id="login">
-          <label>Email address<input type="email" name="email" autocomplete="username" required></label>
-          <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
-          <p class="form-error" data-error role="alert"></p>
-          <button class="primary full" type="submit">Sign in</button>
-        </form>
-      </div>
+      <aside class="intro" aria-labelledby="entry-title">
+        <div class="intro-content">
+          <div class="illustration" aria-hidden="true">
+            <div class="paper paper-back"></div>
+            <div class="paper paper-front"><div class="paper-title"></div><i></i><i></i><i></i><div class="paper-mark">✓</div></div>
+          </div>
+          <h2 id="entry-title">Manage and take<br>online examinations.</h2>
+        </div>
+      </aside>
     </section>`)
   bindForm('#login', async data => {
     await signIn(data.get('email').trim(), data.get('password'))
