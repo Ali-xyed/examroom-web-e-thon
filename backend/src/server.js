@@ -5,6 +5,7 @@ import datesheetRouter from './routes/datesheet.js'
 import proctorRouter   from './routes/proctor.js'
 import aiGradeRouter   from './routes/aiGrade.js'
 import aiExamRouter    from './routes/aiExam.js'
+import aiPrepRouter    from './routes/aiPrep.js'
 import scoreMailRouter from './routes/scoreMail.js'
 
 const app  = express()
@@ -18,6 +19,7 @@ app.use('/api/datesheet',  datesheetRouter)
 app.use('/api/proctor',    proctorRouter)   // POST /upload, GET /image/:captureId, POST /review, POST /cleanup
 app.use('/api/ai-grade',   aiGradeRouter)   // POST /
 app.use('/api/ai-exam',    aiExamRouter)    // POST /
+app.use('/api/ai-prep',    aiPrepRouter)    // POST /
 app.use('/api/score-mail', scoreMailRouter) // POST /
 
 // Health check

@@ -12,6 +12,7 @@
     "api/proctor-cleanup.js": { "maxDuration": 300 },
     "api/ai-grade.js":        { "maxDuration": 60 },
     "api/ai-exam.js":         { "maxDuration": 60 },
+    "api/ai-prep.js":         { "maxDuration": 60 },
     "api/score-mail.js":      { "maxDuration": 60 }
   },
   "rewrites": [

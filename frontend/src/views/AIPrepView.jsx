@@ -2,9 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { examRequest } from '../api.js'
 import { Panel, Button, PageHeader } from '../components/ui.jsx'
 
-const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || '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'
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = 'openai/gpt-oss-120b'
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 // Simple markdown renderer — no external lib
 function renderMarkdown(text) {
@@ -180,26 +178,22 @@ export default function AIPrepView({ notify, dashboard }) {
     const history = nextMessages.map(m => ({ role: m.role, content: m.content }))
 
     try {
-      const response = await fetch(GROQ_URL, {
+      const response = await fetch(`${API_URL}/api/ai-prep`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${GROQ_KEY}`,
         },
         body: JSON.stringify({
-          model: MODEL,
           messages: [
             { role: 'system', content: systemPrompt(selectedExam) },
             ...history,
           ],
-          max_tokens: 1024,
-          temperature: 0.7,
         }),
       })
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}))
-        throw new Error(err?.error?.message || 'AI request failed.')
+        throw new Error(err?.error || err?.error?.message || 'AI request failed.')
       }
 
       const data = await response.json()
