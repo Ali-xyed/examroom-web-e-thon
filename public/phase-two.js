@@ -20,9 +20,21 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
       <label>Name<input name="name" required maxlength="100" value="${safe(user.name)}"></label>
       ${user.id ? '' : '<label>Email<input name="email" type="email" required></label>'}
       <label>Role<select name="role">${['candidate','examiner','administrator'].map(role => `<option ${user.role === role ? 'selected' : ''}>${role}</option>`).join('')}</select></label>
-      <label>${user.id ? 'New password (optional)' : 'Password'}<input name="password" type="password" minlength="12" ${user.id ? '' : 'required'} autocomplete="new-password"></label>
+      <div class="password-wrap">
+        <label>${user.id ? 'New password (optional)' : 'Password'}<input id="password" name="password" type="password" minlength="12" ${user.id ? '' : 'required'} autocomplete="new-password"></label>
+        <button type="button" id="password-toggle" aria-label="Show password" aria-controls="password" aria-pressed="false"><span aria-hidden="true"></span></button>
+      </div>
       <label class="flag"><input name="active" type="checkbox" ${user.active !== false ? 'checked' : ''}> Active account</label>
       <button class="primary">Save account</button></form>`
+      const password = document.querySelector('#editor [name="password"]')
+      const toggle = document.querySelector('#editor #password-toggle')
+      toggle.onclick = () => {
+        const visible = password.type === 'password'
+        password.type = visible ? 'text' : 'password'
+        toggle.setAttribute('aria-label', visible ? 'Hide password' : 'Show password')
+        toggle.setAttribute('aria-pressed', String(visible))
+        toggle.classList.toggle('revealed', visible)
+      }
       document.querySelector('#editor form').onsubmit = async event => {
         event.preventDefault()
         const data = Object.fromEntries(new FormData(event.currentTarget))
