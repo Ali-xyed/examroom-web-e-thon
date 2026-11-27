@@ -1,4 +1,4 @@
-const cacheName='uncooked-users-v1'
+const cacheName='uncooked-reports-v2'
 const shell=['/login','/index.html','/styles.css','/refinements.css','/site.css','/app.js','/api.js','/config.js','/site.js','/phase-two.js','/users.js','/phase-three.js','/import-preview.js','/report-pdf.js','/reference/uc-logo.png']
 self.addEventListener('install',event=>{event.waitUntil(caches.open(cacheName).then(cache=>cache.addAll(shell)).then(()=>self.skipWaiting()))})
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==cacheName).map(key=>caches.delete(key)))).then(()=>self.clients.claim()))})
