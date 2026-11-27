@@ -1,3 +1,4 @@
+import {build} from 'esbuild'
 import { cp, mkdir, writeFile } from 'node:fs/promises'
 
 const url = process.env.SUPABASE_URL?.trim().replace(/\/$/, '')
@@ -16,3 +17,5 @@ await mkdir('dist/vendor', {recursive:true})
 await cp('node_modules/jspdf/dist/jspdf.umd.min.js', 'dist/vendor/jspdf.umd.min.js')
 await cp('node_modules/jspdf/LICENSE', 'dist/vendor/jspdf.LICENSE')
 await writeFile('dist/config.js', 'export default ' + JSON.stringify({ url, key }) + '\n')
+
+await build({stdin:{contents:"export {createClient} from '@supabase/supabase-js'",resolveDir:process.cwd()},bundle:true,format:'esm',platform:'browser',outfile:'dist/vendor/supabase.js',minify:true})

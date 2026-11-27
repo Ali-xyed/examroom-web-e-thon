@@ -1,3 +1,6 @@
+import {ensureIntegrityAlerts,stopIntegrityAlerts} from './live-monitor.js'
+import { loadRecord, storeRecord, integrityCapture } from './attempt-store.js'
+import { assessmentView, disputeShortcut } from './assessment-tools.js'
 import { candidateDirectory } from './candidate-directory.js'
 import { examRequest, hasSession, signIn, signOut } from './api.js'
 import { phaseThree, verification, downloadReport, workspaceTools, readLocal, writeLocal, removeLocal } from './phase-three.js'
@@ -31,6 +34,7 @@ function notify(message, error = false) {
 }
 
 function show(html) {
+  dispatchEvent(new Event('workspace-view-change'))
   activeAttempt?.cleanup?.()
   clearInterval(timer)
   activeAttempt = null
@@ -176,6 +180,7 @@ function questionFields(index, q = {}) {
     <div class="fields">
       ${['A', 'B', 'C', 'D'].map((letter, i) => `<label>Choice ${letter}<input name="choice" required maxlength="500" value="${safe(choices[i] || '')}"></label>`).join('')}
       <label>Correct choice<select name="correct">${['A','B','C','D'].map((letter, i) => `<option value="${i}" ${Number(q.correct) === i ? 'selected' : ''}>${letter}</option>`).join('')}</select></label>
+      <label>Difficulty<select name="difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>
       <label>Marks<input name="marks" type="number" required min="1" max="100" value="${q.marks || 1}"></label>
     </div>
     <button class="link-button remove-question" type="button">Remove question</button>
@@ -338,6 +343,7 @@ async function create() {
       choices: [...card.querySelectorAll('[name="choice"]')].map(el => el.value),
       correct: Number(card.querySelector('[name="correct"]').value),
       marks: Number(card.querySelector('[name="marks"]').value),
+      difficulty: card.querySelector('[name="difficulty"]').value,
     }))
     const result = await examRequest('create', {
       title: data.get('title'), instructions: data.get('instructions'), duration: Number(data.get('duration')),
@@ -362,9 +368,9 @@ function manage(id, data) {
       <dl class="metadata"><div><dt>Opens</dt><dd>${date(exam.opens_at)}</dd></div>
         <div><dt>Closes</dt><dd>${date(exam.closes_at)}</dd></div>
         <div><dt>Duration</dt><dd>${exam.duration} min</dd></div>
-        <div><dt>Total marks</dt><dd>${questions.reduce((sum, q) => sum + q.marks, 0)}</dd></div></dl>
+        <div><dt>Total marks</dt><dd>${exam.blueprint?.length?exam.blueprint.reduce((sum,b)=>sum+b.count*b.marks,0):questions.reduce((sum,q)=>sum+q.marks,0)}</dd></div></dl>
       ${exam.instructions ? '<p class="exam-instructions">' + safe(exam.instructions) + '</p>' : ''}
-      <h3>Questions</h3><ol class="question-summary">${questions.map(q => `<li><span>${safe(q.prompt)}</span><span>${q.marks} marks</span></li>`).join('')}</ol>
+      <h3>${exam.blueprint?.length?'Question pool · balanced selection per candidate':'Questions'}</h3><ol class="question-summary">${questions.map(q => `<li><span>${safe(q.prompt)}</span><span>${q.marks} marks</span></li>`).join('')}</ol>
     </section><section class="panel form-panel"><h2>Candidates</h2>
       <form id="enroll"><div class="inline-form"><label>Candidate email<input name="email" type="email" required></label>
         <button type="submit" class="secondary">Enroll</button></div><p class="form-error" data-error role="alert"></p></form>
@@ -392,17 +398,22 @@ function receipt(exam, submittedAt) {
   show(`<nav class="breadcrumb" aria-label="Breadcrumb"><a class="back" href="#">← Back to My examinations</a><span aria-hidden="true">/</span><span>Submission receipt</span></nav><section class="panel receipt">
     <span class="receipt-icon" aria-hidden="true">✓</span><h1>Attempt submitted</h1>
     <p>${safe(exam.title)}</p><p class="muted">Submission recorded at ${date(submittedAt)}.</p>
-    <a class="button secondary" href="#">Back to examinations</a></section>`)
+    <a class="button secondary" href="#">Back to examinations</a> <a class="button secondary" href="#disputes/${exam.id}">Question disputes</a></section>`)
 }
 
-function take(id, data) {
+async function take(id, data) {
   if (data.submittedAt) { removeLocal('pending-'+id); return receipt(data.exam, data.submittedAt) }
   const { exam, questions } = data
   const sandbox = Boolean(data.sandbox)
   data.cachedAt ??= Date.now()
   if (!sandbox) writeLocal('attempt-'+id, data)
   const pendingKey = 'pending-'+id
+  const requestedHash=location.hash
+  const stored = sandbox ? {} : await loadRecord(pendingKey,{}).catch(()=>({}))
+  if(location.hash!==requestedHash)return
+  if (!document.querySelector('#main')) return
   const pending = sandbox ? {} : readLocal(pendingKey,{})
+  for (const [qid,snapshot] of Object.entries(stored)) if (!pending[qid] || snapshot.revision>pending[qid].revision) pending[qid]=snapshot
   for (const q of questions) { if (pending[q.id]) Object.assign(q,pending[q.id]) }
   const request = sandbox ? async (operation) => ({serverTime:new Date().toISOString(), submittedAt: operation === 'submit' ? new Date().toISOString() : null}) : examRequest
   const state = { id, sandbox, chain: Promise.resolve(), unsaved: new Map(), submitting: false, index: 0 }
@@ -444,22 +455,36 @@ function take(id, data) {
   function finalize(response) {
     if (!response.submittedAt) return false
     if (!sandbox && state.unsaved.size) notify('The attempt is finalized. Changes that were not synchronized before the deadline were not included.', true)
-    if (!sandbox) removeLocal(pendingKey)
+    if (!sandbox) { removeLocal(pendingKey); void storeRecord(pendingKey,undefined).catch(()=>{}); void storeRecord('attempt-'+id,undefined).catch(()=>{}); removeLocal('attempt-'+id) }
     if (sandbox) { show('<section class="panel form-panel"><h1>Sandbox complete</h1><p>This preview is complete.</p><a href="#manage/'+id+'">Back to exam</a></section>'); return true }
     receipt(exam, response.submittedAt)
     return true
   }
-  function enqueue(q) {
-    const revision = Math.max(Date.now(),readLocal('revision',0)+1)
+  const activeTimes = new Map(questions.map(q=>[q.id,Number(q.activeMs||0)]))
+  let trackingActive=!document.hidden
+  let questionEntered = performance.now()
+  function accountTime() {
+    const q=questions[state.index]
+    if(q && trackingActive) activeTimes.set(q.id,(activeTimes.get(q.id)||0)+Math.max(0,performance.now()-questionEntered))
+    questionEntered=performance.now()
+  }
+  const trackVisibility=()=>{accountTime();trackingActive=!document.hidden;questionEntered=performance.now()}
+  document.addEventListener('visibilitychange',trackVisibility)
+  function enqueue(q,replay=false) {
+    accountTime()
+    const revision = replay&&pending[q.id] ? pending[q.id].revision : Math.max(Date.now(),readLocal('revision',0)+1,Number(q.revision||0)+1)
     writeLocal('revision',revision)
-    const snapshot = { revision, examId: id, questionId: q.id, choice: q.choice, flagged: q.flagged, selected: [...(q.selected || [])], written: q.written || '' }
+    const snapshot = { activeMs:Math.round(Math.max(activeTimes.get(q.id)||0,Number(pending[q.id]?.activeMs||0))), revision, examId: id, questionId: q.id, choice: q.choice, flagged: q.flagged, selected: [...(q.selected || [])], written: q.written || '' }
+    q.activeMs=snapshot.activeMs
     state.unsaved.set(q.id, snapshot)
     pending[q.id] = snapshot
     if (!sandbox) writeLocal('attempt-'+id, data)
     if (!sandbox && !writeLocal(pendingKey,pending)) notify('Local recovery storage is unavailable. Keep this page open until answers are saved.',true)
     saveState.textContent = navigator.onLine ? 'Saving changes…' : 'Offline · Answers pending synchronization'
     retry.hidden = true
+    const durable = sandbox ? Promise.resolve() : storeRecord(pendingKey,pending).then(()=>storeRecord('attempt-'+id,data)).catch(()=>notify('IndexedDB recovery is unavailable; browser fallback storage is being used.',true))
     state.chain = state.chain.then(async () => {
+      await durable
       if (activeAttempt !== state || state.unsaved.get(q.id) !== snapshot) return
       try {
         const response = await request('save', snapshot)
@@ -476,7 +501,7 @@ function take(id, data) {
         data.serverTime = response.serverTime
         data.cachedAt = Date.now()
         if (!sandbox) writeLocal('attempt-'+id,data)
-        if (state.unsaved.get(q.id) === snapshot) { state.unsaved.delete(q.id); delete pending[q.id]; if (!sandbox) writeLocal(pendingKey,pending) }
+        if (state.unsaved.get(q.id) === snapshot) { state.unsaved.delete(q.id); delete pending[q.id]; if (!sandbox) {writeLocal(pendingKey,pending);await storeRecord(pendingKey,pending).catch(()=>{})} }
         if (!state.unsaved.size) saveState.textContent = sandbox ? 'Preview changes saved locally' : 'All changes saved'
       } catch {
         saveState.textContent = navigator.onLine ? 'Saving failed · Answers pending synchronization' : 'Offline · Answers pending synchronization'
@@ -485,10 +510,11 @@ function take(id, data) {
     })
   }
   function displayQuestion(index, focus = false) {
+    accountTime()
     state.index = index
     const q = questions[index]
     const section = document.querySelector('#question')
-    section.innerHTML = `<div class="question-meta"><span>Question ${index + 1} of ${questions.length}</span><span>${q.marks} marks</span></div>
+    section.innerHTML = `<div class="question-meta"><span>Question ${index + 1} of ${questions.length}</span><span>${safe(q.difficulty || 'medium')} · ${q.marks} marks</span></div>
       <fieldset class="choices"><legend tabindex="-1">${safe(q.prompt)}</legend>
       ${q.kind === 'written' ? `<label>Written answer<textarea id="written" maxlength="20000" rows="8">${safe(q.written)}</textarea></label>` : q.choices.map((choice, i) => `<label class="choice"><input type="${q.kind === 'multiple' ? 'checkbox' : 'radio'}" name="answer" value="${i}" ${(q.kind === 'multiple' ? q.selected.includes(i) : q.choice === i) ? 'checked' : ''}>
       <span class="letter">${'ABCD'[i]}</span><span>${safe(choice)}</span></label>`).join('')}</fieldset>
@@ -520,7 +546,7 @@ function take(id, data) {
     const button = event.target.closest('[data-index]')
     if (button) displayQuestion(Number(button.dataset.index), true)
   }
-  retry.onclick = () => questions.filter(q => state.unsaved.has(q.id)).forEach(enqueue)
+  retry.onclick = () => questions.filter(q => state.unsaved.has(q.id)).forEach(q=>enqueue(q,true))
   document.querySelector('#review').onclick = () => {
     document.querySelector('#review-summary').textContent =
       answered() + ' of ' + questions.length + ' answered. ' +
@@ -568,13 +594,30 @@ function take(id, data) {
     } finally { setTimeout(() => { checkingExpiry = false }, 3000) }
   }
   displayQuestion(0)
-  const reconnect = () => { if (activeAttempt === state) questions.filter(q => pending[q.id]).forEach(enqueue) }
+  let reconnecting=false
+  const reconnect = async () => {
+    if (activeAttempt!==state || reconnecting) return
+    reconnecting=true
+    try {
+      if(!sandbox){
+        const fresh=await request('resume',{examId:id})
+        if(activeAttempt!==state || finalize(fresh))return
+        remaining=Date.parse(fresh.deadline)-Date.parse(fresh.serverTime);synchronizedAt=performance.now()
+        for(const q of questions){const accepted=fresh.questions.find(x=>x.id===q.id);if(!pending[q.id]&&accepted)Object.assign(q,accepted)}
+      }
+      questions.filter(q=>pending[q.id]).forEach(q=>enqueue(q,true))
+    } catch {saveState.textContent='Offline or reconnecting · recovery queue retained'}
+    finally {reconnecting=false}
+  }
   const connectionLost = () => {
     if (activeAttempt === state && !sandbox) saveState.textContent = 'Offline · Changes stay on this browser until synchronized'
   }
   addEventListener('online',reconnect)
   addEventListener('offline',connectionLost)
-  state.cleanup = () => { removeEventListener('online',reconnect); removeEventListener('offline',connectionLost) }
+  const stopIntegrity=sandbox?()=>{}:integrityCapture(id,request,response=>{if(activeAttempt!==state||finalize(response))return;remaining=Date.parse(response.deadline)-Date.parse(response.serverTime);synchronizedAt=performance.now()},message=>notify(message,true))
+  if(!sandbox)disputeShortcut(id,()=>questions[state.index],{safe,notify})
+  const retryQueue=setInterval(()=>{if(activeAttempt===state&&navigator.onLine&&state.unsaved.size)void reconnect()},5000)
+  state.cleanup = () => {clearInterval(retryQueue);stopIntegrity();document.removeEventListener('visibilitychange',trackVisibility);removeEventListener('online',reconnect);removeEventListener('offline',connectionLost) }
   reconnect()
   void tick()
   timer = setInterval(tick, 1000)
@@ -611,6 +654,7 @@ let routeVersion = 0
 async function route() {
   const version = ++routeVersion
   if (!hasSession()) {
+    stopIntegrityAlerts()
     document.querySelector('#workspace-bar')?.remove()
     return login()
   }
@@ -631,6 +675,8 @@ async function route() {
       navigate()
     }
     renderWorkspaceBar(profile, view)
+    void ensureIntegrityAlerts(profile,{notify})
+    if (['disputes','audit','fairness','datesheet'].includes(view)) {await assessmentView(view,id,{show,safe,notify,profile});return}
     if (['sandbox','analytics','import'].includes(view)) { await phaseThree(view,id,{show,safe,notify,profile,take}); return }
     if (['users','bank','monitor','result'].includes(view)) { await phaseTwo(view,id,{show,safe,notify,profile}); return }
     if (view === 'create' && profile.role === 'examiner') return create()
@@ -643,7 +689,7 @@ async function route() {
     home()
   } catch (error) {
     if (version !== routeVersion) return
-    const cached = view === 'take' && readLocal('attempt-'+id,null)
+    const cached = view === 'take' && (await loadRecord('attempt-'+id,null).catch(()=>null) || readLocal('attempt-'+id,null))
     if (!navigator.onLine && cached && hasSession()) { take(id,{...cached,offline:true}); return }
     if (!hasSession()) login()
     else if (dashboard && view) { await home(); notify(error.message, true) }
@@ -663,14 +709,12 @@ async function route() {
 }
 
 addEventListener('session-ended', event => {
+  stopIntegrityAlerts()
   routeVersion++
   history.replaceState(null, '', '/login')
   login(event.detail)
 })
 
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden && activeAttempt && !activeAttempt.sandbox) examRequest('incident', {examId:activeAttempt.id,event:'page_hidden'}).catch(() => {})
-})
 addEventListener('beforeunload', event => {
   if (activeAttempt?.unsaved.size) event.preventDefault()
 })

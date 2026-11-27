@@ -134,3 +134,6 @@ export async function examRequest(operation, payload = {}) {
     throw error
   }
 }
+
+// Share only the current short-lived user token with authenticated app services.
+export const sessionToken = () => accessToken()

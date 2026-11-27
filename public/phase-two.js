@@ -1,3 +1,4 @@
+import { liveMonitor } from './live-monitor.js'
 import { manageUsers } from './users.js'
 import { examRequest } from './api.js'
 import { downloadReport } from './phase-three.js'
@@ -183,6 +184,7 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
         ${at.submittedAt ? at.written.map(q=>`<form data-grade="${at.id}" data-question="${q.id}"><h3>${safe(q.prompt)}</h3><p class="exam-instructions">${safe(q.response || '(No response)')}</p>
           <label>Marks out of ${q.marks}<input type="number" name="grade" min="0" max="${q.marks}" step="0.01" value="${q.grade??''}" required ${data.published?'disabled':''}></label>
           <button class="secondary" ${data.published?'disabled':''}>Save grade</button></form>`).join('') : ''}</section>`).join('')}`)
+    void liveMonitor(id,{notify,safe})
     const refresh=()=>phaseTwo(view,id,{show,safe,notify,profile})
     document.querySelector('#refresh-monitor').onclick=()=>refresh().catch(e=>notify(e.message,true))
     document.querySelector('#announce').onsubmit=event=>{
@@ -202,6 +204,7 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
     show(`<nav class="breadcrumb" aria-label="Breadcrumb"><a class="back" href="#">← Back to My examinations</a><span aria-hidden="true">/</span><span>Result</span></nav><section class="panel form-panel"><h1>Your result</h1>`+
       (result.published ? result.scores.map(s=>`<p>Score <strong>${s.score} / ${s.total}</strong></p>`).join('') || '<p>No submitted attempt.</p>' : '<p>Your examiner has not published results yet.</p>')+
       (result.published && result.scores.length ? '<button class="primary" id="report">Download verified PDF report</button><p id="report-verification"></p>' : '')+'</section>')
+    document.querySelector('section.panel').insertAdjacentHTML('beforeend',`<p><a class="button secondary" href="#disputes/${id}">Question or grade dispute</a></p>`)
     const reportButton=document.querySelector('#report')
     if(reportButton) reportButton.onclick=async()=>{
       try {
@@ -217,7 +220,7 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
 
 export async function examTools(id, {safe, notify}) {
   const heading=document.querySelector('.heading')
-  heading.insertAdjacentHTML('afterend',`<div class="form-actions"><a class="button secondary" href="#monitor/${id}">Monitor and grade</a><a class="button secondary" href="#sandbox/${id}">Preview as candidate</a><a class="button secondary" href="#analytics/${id}">Question analytics</a><button class="secondary" id="exam-settings">Question bank and settings</button></div><div id="exam-tools"></div>`)
+  heading.insertAdjacentHTML('afterend',`<div class="form-actions"><a class="button secondary" href="#monitor/${id}">Monitor and grade</a><a class="button secondary" href="#sandbox/${id}">Preview as candidate</a><a class="button secondary" href="#analytics/${id}">Question analytics</a><a class="button secondary" href="#fairness/${id}">Balanced paper settings</a><a class="button secondary" href="#disputes/${id}">Dispute queue</a><a class="button secondary" href="#audit/${id}">Audit log</a><a class="button secondary" href="#datesheet/${id}">Email datesheet</a><button class="secondary" id="exam-settings">Question bank and settings</button></div><div id="exam-tools"></div>`)
   document.querySelector('#exam-settings').onclick=async()=>{
     try {
       const [bank, detail]=await Promise.all([examRequest('bank'),examRequest('manage',{examId:id})])
