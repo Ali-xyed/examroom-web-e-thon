@@ -39,7 +39,17 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
     if (!streamRef.current || !enabled) return null
     try {
       const video = videoRef.current
-      if (!video || video.readyState < 2) return null
+      if (!video) return null
+
+      // Wait up to 5 s for the video to be ready (readyState >= 2 means HAVE_CURRENT_DATA)
+      if (video.readyState < 2) {
+        await new Promise((resolve) => {
+          const onReady = () => { video.removeEventListener('canplay', onReady); resolve() }
+          video.addEventListener('canplay', onReady)
+          setTimeout(resolve, 5000) // give up after 5 s
+        })
+      }
+      if (video.readyState < 2) return null
       const canvas = document.createElement('canvas')
       canvas.width = 480
       canvas.height = 360
@@ -159,7 +169,7 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
 
     let delay
     if (isInitial && captureCount.current === 0) {
-      delay = 3000  // first capture at 3s
+      delay = 8000  // first capture at 8s — gives camera time to fully initialize
     } else if (captureCount.current <= 1) {
       delay = 12000 // second capture at ~15s total
     } else {
@@ -169,6 +179,8 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
     nextCaptureAt.current = Date.now() + delay
     captureTimerRef.current = setTimeout(async () => {
       if (statusRef.current !== 'active') {
+        // If stopped, do not reschedule. Any other transient state: reschedule.
+        if (statusRef.current !== 'stopped') scheduleNextRef.current?.(false)
         console.warn('[Proctor] Skipping capture — status:', statusRef.current)
         return
       }
@@ -183,7 +195,7 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
       } else {
         await recordMissed(['no_face'])
       }
-      // Schedule next via ref to avoid stale closure issues
+      // Always schedule next — even if this capture was missed/failed
       scheduleNextRef.current?.(false)
     }, delay)
   }, [enabled, captureFrame, analyzeFrame, uploadCapture, recordMissed])

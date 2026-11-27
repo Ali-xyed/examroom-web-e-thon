@@ -64,7 +64,6 @@ export async function upload(req, res) {
         .eq('id', attemptId)
         .eq('candidate_id', user.id)
         .is('submitted_at', null)
-        .gt('deadline', new Date().toISOString())
         .single()
 
       if (attemptErr || !attempt)
@@ -127,14 +126,16 @@ export async function upload(req, res) {
       if (req.file.size > 153600)
         return res.status(400).json({ error: 'Image exceeds the 150 KB limit.' })
 
-      // 4. Verify attempt belongs to caller, is active
+      // 4. Verify attempt belongs to caller, is active (allow a 60s grace window for
+      //    captures taken near deadline to avoid spurious 403s due to clock skew)
+      const graceWindow = new Date(Date.now() - 60000).toISOString()
       const { data: attempt, error: attemptErr } = await supabase
         .from('attempts')
         .select('id, candidate_id, exam_id, submitted_at, deadline')
         .eq('id', attemptId)
         .eq('candidate_id', user.id)
         .is('submitted_at', null)
-        .gt('deadline', new Date().toISOString())
+        .gt('deadline', graceWindow)
         .single()
 
       if (attemptErr || !attempt)
