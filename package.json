@@ -9,5 +9,5 @@
     "smoke": "node --env-file-if-exists=.env scripts/smoke.mjs",
     "check": "node --check public/app.js && node --check public/api.js && node --check scripts/build.mjs && node --check scripts/dev.mjs && node --check scripts/smoke.mjs"
   },
-  "engines": { "node": ">=22" }
+  "engines": { "node": "22.x" }
 }

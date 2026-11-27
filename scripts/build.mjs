@@ -1,12 +1,12 @@
 import { cp, mkdir, writeFile } from 'node:fs/promises'
 
-const url = process.env.SUPABASE_URL?.replace(/\/$/, '')
-const key = process.env.SUPABASE_PUBLISHABLE_KEY
+const url = process.env.SUPABASE_URL?.trim().replace(/\/$/, '')
+const key = process.env.SUPABASE_PUBLISHABLE_KEY?.trim()
 
-if (!url || !key || !/^https:\/\/[a-z0-9]+\.supabase\.co$/i.test(url)) {
-  throw new Error('Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY before building.')
+if (!url || !/^https:\/\/[a-z0-9]+\.supabase\.co$/i.test(url)) {
+  throw new Error('Set SUPABASE_URL to the hosted Supabase project URL before building.')
 }
-if (!key.startsWith('sb_publishable_')) {
+if (!key?.startsWith('sb_publishable_')) {
   throw new Error('Use the Supabase publishable key. Never use a privileged key in this build.')
 }
 
