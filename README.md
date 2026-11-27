@@ -10,6 +10,20 @@ Use **Question bank and settings** on an exam to assign questions and enable sta
 
 Run `node --env-file=.env scripts/phase-two-smoke.mjs` for the mixed-format API verification.
 
+## Phase 3
+
+Use **Bulk import** for JSON candidate-account imports as an administrator or question-bank imports as an examiner. Download the sample from the import screen. Up to 200 records are validated in one transaction, with a row number for failures and complete rollback on an invalid record.
+
+Use **Preview as candidate** on an exam for a sandbox session. It performs local practice saves and creates no real attempt. **Question analytics** summarizes skipped and incorrect objective responses and average written marks from submitted attempts.
+
+Candidates can download verified PDF reports from their published results. Examiners can download a PDF summary from the monitoring screen. Each candidate report has a verification code and URL. Public verification confirms authenticity and issue time without returning the candidate's name or score. Unpublishing or changing the issued score invalidates verification.
+
+The exam workspace includes text-size and layout preferences, plus a scratchpad saved in the browser. Preferences and scratchpad storage are scoped to the signed-in account. The application caches its exam shell for offline refresh after a successful first load. Pending answers are saved locally and retried after reconnection. Revision numbers prevent an older retry from overwriting a newer accepted answer. The original server deadline remains authoritative, and local changes arriving after expiry are rejected.
+
+The failure-resilience innovation addresses network interruptions and refreshes on the same browser. Recovery requires that the candidate has previously loaded the exam online and retained browser storage. A failed device's unsynchronized local work cannot be recovered on another device. PDF text currently supports the basic Latin character set.
+
+Run `node --env-file=.env scripts/phase-three-smoke.mjs` for import, sandbox, revision, analytics, and report-verification checks. It uses the separate fictional `phase3-admin@examroom.example` QA account.
+
 ## Local setup
 
 1. Use Node.js 22 or newer and a Supabase project. Apply the migration in `supabase/migrations`.

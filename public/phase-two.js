@@ -1,4 +1,5 @@
 import { examRequest } from './api.js'
+import { downloadReport } from './phase-three.js'
 
 export async function phaseTwo(view, id, { show, safe, notify, profile }) {
   const links = profile.role === 'administrator' ? '<a class="button secondary" href="#users">Manage users</a>'
@@ -118,7 +119,7 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
       <form class="panel form-panel" id="announce"><label>Announcement<textarea name="message" required maxlength="2000"></textarea></label><button class="primary">Send announcement</button></form>
       <section class="panel form-panel"><h2>Results</h2><p>${data.scores.length} submitted attempts · Average score ${data.scores.length ? (data.scores.reduce((s,r)=>s+Number(r.score),0)/data.scores.length).toFixed(2) : '—'}</p>
       ${data.scores.map(s=>`<p>${safe(s.name)} · ${s.score}/${s.total} · ${s.pending} written questions awaiting grading</p>`).join('')}
-      <button class="primary" id="publish-results">${data.published?'Unpublish results':'Publish results'}</button></section>
+      <button class="primary" id="publish-results">${data.published?'Unpublish results':'Publish results'}</button> <button class="secondary" id="report">Download PDF summary</button></section>
       ${data.attempts.map(at=>`<section class="panel form-panel"><h2>${safe(at.name)}</h2><p>${at.submittedAt?'Submitted':'In progress'} · ${at.answered} answered</p>
         <ul>${at.incidents.map(i=>`<li>${safe(i.event)} · ${new Date(i.created_at).toLocaleString()}</li>`).join('')}</ul>
         ${at.submittedAt ? at.written.map(q=>`<form data-grade="${at.id}" data-question="${q.id}"><h3>${safe(q.prompt)}</h3><p class="exam-instructions">${safe(q.response || '(No response)')}</p>
@@ -130,6 +131,9 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
       event.preventDefault(); action('announce',{examId:id,message:new FormData(event.currentTarget).get('message')},refresh)
     }
     document.querySelector('#publish-results').onclick=()=>action('publish_results',{examId:id,published:!data.published},refresh)
+    document.querySelector('#report').onclick=async()=>{
+      try { downloadReport(await examRequest('report',{examId:id})) } catch(error) { notify(error.message,true) }
+    }
     document.querySelectorAll('[data-grade]').forEach(form=>form.onsubmit=event=>{
       event.preventDefault(); action('grade',{examId:id,attemptId:form.dataset.grade,questionId:form.dataset.question,grade:new FormData(form).get('grade')},refresh)
     })
@@ -138,7 +142,16 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
   if (view === 'result') {
     const result=await examRequest('result',{examId:id})
     show(back+'<section class="panel form-panel"><h1>Your result</h1>'+
-      (result.published ? result.scores.map(s=>`<p>Score <strong>${s.score} / ${s.total}</strong></p>`).join('') || '<p>No submitted attempt.</p>' : '<p>Your examiner has not published results yet.</p>')+'</section>')
+      (result.published ? result.scores.map(s=>`<p>Score <strong>${s.score} / ${s.total}</strong></p>`).join('') || '<p>No submitted attempt.</p>' : '<p>Your examiner has not published results yet.</p>')+
+      (result.published && result.scores.length ? '<button class="primary" id="report">Download verified PDF report</button><p id="report-verification"></p>' : '')+'</section>')
+    const reportButton=document.querySelector('#report')
+    if(reportButton) reportButton.onclick=async()=>{
+      try {
+        const report=await examRequest('report',{examId:id})
+        downloadReport(report)
+        document.querySelector('#report-verification').innerHTML='<a target="_blank" rel="noopener" href="/?verify='+report.token+'">Verify this report</a>'
+      }catch(error){notify(error.message,true)}
+    }
     return true
   }
   return false
@@ -146,7 +159,7 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
 
 export async function examTools(id, {safe, notify}) {
   const heading=document.querySelector('.heading')
-  heading.insertAdjacentHTML('afterend',`<div class="form-actions"><a class="button secondary" href="#monitor/${id}">Monitor and grade</a><button class="secondary" id="exam-settings">Question bank and settings</button></div><div id="exam-tools"></div>`)
+  heading.insertAdjacentHTML('afterend',`<div class="form-actions"><a class="button secondary" href="#monitor/${id}">Monitor and grade</a><a class="button secondary" href="#sandbox/${id}">Preview as candidate</a><a class="button secondary" href="#analytics/${id}">Question analytics</a><button class="secondary" id="exam-settings">Question bank and settings</button></div><div id="exam-tools"></div>`)
   document.querySelector('#exam-settings').onclick=async()=>{
     try {
       const [bank, detail]=await Promise.all([examRequest('bank'),examRequest('manage',{examId:id})])

@@ -1,4 +1,5 @@
 import { examRequest, hasSession, signIn, signOut } from './api.js'
+import { phaseThree, verification, downloadReport, workspaceTools, readLocal, writeLocal, removeLocal } from './phase-three.js'
 import { phaseTwo, examTools } from './phase-two.js'
 import { authPanel, landing, landingNav } from './site.js'
 
@@ -29,6 +30,7 @@ function notify(message, error = false) {
 }
 
 function show(html) {
+  activeAttempt?.cleanup?.()
   clearInterval(timer)
   activeAttempt = null
   main.innerHTML = html
@@ -145,7 +147,7 @@ async function home() {
     administrator: 'View examination activity across the platform.',
   }
   show(`${pageHeader(title, descriptions[profile.role], examiner ? '<a class="button primary" href="#create">New examination</a>' : '')}
-    <div class="form-actions">${await phaseTwo('',null,{show,safe,notify,profile})}</div><section class="exam-list" aria-label="Examinations">
+    <div class="form-actions">${profile.role !== 'candidate' ? '<a class="button secondary" href="#import">Bulk import</a>' : ''}${await phaseTwo('',null,{show,safe,notify,profile})}</div><section class="exam-list" aria-label="Examinations">
     ${exams.length ? exams.map(exam => {
       const status = statusOf(exam, now)
       // An existing attempt can still be opened after the exam closes.
@@ -286,12 +288,20 @@ function receipt(exam, submittedAt) {
 }
 
 function take(id, data) {
-  if (data.submittedAt) return receipt(data.exam, data.submittedAt)
+  if (data.submittedAt) { removeLocal('pending-'+id); return receipt(data.exam, data.submittedAt) }
   const { exam, questions } = data
-  const state = { id, chain: Promise.resolve(), unsaved: new Map(), submitting: false, index: 0 }
-  let remaining = Date.parse(data.deadline) - Date.parse(data.serverTime)
+  const sandbox = Boolean(data.sandbox)
+  data.cachedAt ??= Date.now()
+  if (!sandbox) writeLocal('attempt-'+id, data)
+  const pendingKey = 'pending-'+id
+  const pending = sandbox ? {} : readLocal(pendingKey,{})
+  for (const q of questions) { if (pending[q.id]) Object.assign(q,pending[q.id]) }
+  const request = sandbox ? async (operation) => ({serverTime:new Date().toISOString(), submittedAt: operation === 'submit' ? new Date().toISOString() : null}) : examRequest
+  const state = { id, sandbox, chain: Promise.resolve(), unsaved: new Map(), submitting: false, index: 0 }
+  let remaining = Date.parse(data.deadline) - Date.parse(data.serverTime) - (data.offline ? Math.max(0,Date.now()-data.cachedAt) : 0)
   let synchronizedAt = performance.now()
   show(`<a class="back" href="#">My examinations</a>
+    ${sandbox ? '<p class="pill">Examiner sandbox · Practice answers are local to this preview</p>' : ''}
     ${pageHeader(exam.title, exam.instructions || 'Answer the questions and submit before time expires.',
       '<div class="timer"><span>Time remaining</span><strong id="clock">--:--</strong></div>')}
     <div class="attempt-grid"><section class="panel form-panel" id="question"></section>
@@ -308,6 +318,7 @@ function take(id, data) {
     </dialog>`)
   activeAttempt = state
   document.querySelector('.attempt-sidebar').insertAdjacentHTML('beforeend', '<div id="announcements" aria-live="polite"></div>')
+  workspaceTools(id,sandbox,notify)
   let nextPoll = 0
   const saveState = document.querySelector('#save-state')
   const retry = document.querySelector('#retry')
@@ -324,25 +335,43 @@ function take(id, data) {
   }
   function finalize(response) {
     if (!response.submittedAt) return false
+    if (!sandbox && state.unsaved.size) notify('The attempt is finalized. Changes that were not synchronized before the deadline were not included.', true)
+    if (!sandbox) removeLocal(pendingKey)
+    if (sandbox) { show('<section class="panel form-panel"><h1>Sandbox complete</h1><p>This preview is complete.</p><a href="#manage/'+id+'">Back to exam</a></section>'); return true }
     receipt(exam, response.submittedAt)
     return true
   }
   function enqueue(q) {
-    const snapshot = { examId: id, questionId: q.id, choice: q.choice, flagged: q.flagged, selected: [...(q.selected || [])], written: q.written || '' }
+    const revision = Math.max(Date.now(),readLocal('revision',0)+1)
+    writeLocal('revision',revision)
+    const snapshot = { revision, examId: id, questionId: q.id, choice: q.choice, flagged: q.flagged, selected: [...(q.selected || [])], written: q.written || '' }
     state.unsaved.set(q.id, snapshot)
-    saveState.textContent = 'Saving changes…'
+    pending[q.id] = snapshot
+    if (!sandbox) writeLocal('attempt-'+id, data)
+    if (!sandbox && !writeLocal(pendingKey,pending)) notify('Local recovery storage is unavailable. Keep this page open until answers are saved.',true)
+    saveState.textContent = navigator.onLine ? 'Saving changes…' : 'Offline · Answers pending synchronization'
     retry.hidden = true
     state.chain = state.chain.then(async () => {
       if (activeAttempt !== state || state.unsaved.get(q.id) !== snapshot) return
       try {
-        const response = await examRequest('save', snapshot)
+        const response = await request('save', snapshot)
         if (activeAttempt !== state || finalize(response)) return
+        if (response.stale && state.unsaved.get(q.id) === snapshot) {
+          const fresh = await request('resume', {examId:id})
+          if (activeAttempt !== state || finalize(fresh)) return
+          Object.assign(q, fresh.questions.find(question => question.id === q.id))
+          displayQuestion(state.index)
+          notify('A newer answer was already accepted. The workspace now shows the accepted answer.')
+        }
         remaining = Date.parse(data.deadline) - Date.parse(response.serverTime)
         synchronizedAt = performance.now()
-        if (state.unsaved.get(q.id) === snapshot) state.unsaved.delete(q.id)
-        if (!state.unsaved.size) saveState.textContent = 'All changes saved'
+        data.serverTime = response.serverTime
+        data.cachedAt = Date.now()
+        if (!sandbox) writeLocal('attempt-'+id,data)
+        if (state.unsaved.get(q.id) === snapshot) { state.unsaved.delete(q.id); delete pending[q.id]; if (!sandbox) writeLocal(pendingKey,pending) }
+        if (!state.unsaved.size) saveState.textContent = sandbox ? 'Preview changes saved locally' : 'All changes saved'
       } catch {
-        saveState.textContent = 'Some changes could not be saved.'
+        saveState.textContent = navigator.onLine ? 'Saving failed · Answers pending synchronization' : 'Offline · Answers pending synchronization'
         retry.hidden = false
       }
     })
@@ -399,7 +428,7 @@ function take(id, data) {
       await state.chain
       if (activeAttempt !== state) return
       if (state.unsaved.size) throw new Error('Retry saving your pending changes before submitting.')
-      finalize(await examRequest('submit', { examId: id }))
+      finalize(await request('submit', { examId: id }))
     } catch (error) {
       dialog.close()
       notify(error.message, true)
@@ -408,7 +437,7 @@ function take(id, data) {
   const clock = document.querySelector('#clock')
   let checkingExpiry = false
   async function tick() {
-    if (performance.now() > nextPoll) {
+    if (!sandbox && performance.now() > nextPoll) {
       nextPoll = performance.now() + 10000
       examRequest('announcements', {examId:id}).then(items => {
         if (activeAttempt === state) document.querySelector('#announcements').innerHTML = items.map(item => '<p>' + safe(item.message) + '</p>').join('')
@@ -416,11 +445,12 @@ function take(id, data) {
     }
     const seconds = Math.max(0, Math.ceil((remaining - (performance.now() - synchronizedAt)) / 1000))
     clock.textContent = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0')
+    document.querySelector('#question').inert = seconds === 0
     clock.classList.toggle('low', seconds < 60)
     if (seconds || checkingExpiry || state.submitting) return
     checkingExpiry = true
     try {
-      const fresh = await examRequest('resume', { examId: id })
+      const fresh = sandbox ? {submittedAt:new Date().toISOString()} : await request('resume', { examId: id })
       if (activeAttempt === state && !finalize(fresh)) {
         remaining = Date.parse(fresh.deadline) - Date.parse(fresh.serverTime)
         synchronizedAt = performance.now()
@@ -430,6 +460,14 @@ function take(id, data) {
     } finally { setTimeout(() => { checkingExpiry = false }, 3000) }
   }
   displayQuestion(0)
+  const reconnect = () => { if (activeAttempt === state) questions.filter(q => pending[q.id]).forEach(enqueue) }
+  const connectionLost = () => {
+    if (activeAttempt === state && !sandbox) saveState.textContent = 'Offline · Changes stay on this browser until synchronized'
+  }
+  addEventListener('online',reconnect)
+  addEventListener('offline',connectionLost)
+  state.cleanup = () => { removeEventListener('online',reconnect); removeEventListener('offline',connectionLost) }
+  reconnect()
   void tick()
   timer = setInterval(tick, 1000)
 }
@@ -447,6 +485,7 @@ async function route() {
     document.body.dataset.view = 'workspace'
     brand.href = '/login'
     const { profile } = dashboard
+    if (['sandbox','analytics','import'].includes(view)) { await phaseThree(view,id,{show,safe,notify,profile,take}); return }
     if (['users','bank','monitor','result'].includes(view)) { await phaseTwo(view,id,{show,safe,notify,profile}); return }
     account.innerHTML = `<div class="account-label"><strong>${safe(profile.name)}</strong>
       <span>${roles[profile.role]}</span></div><button class="secondary" id="logout" type="button">Sign out</button>`
@@ -464,6 +503,8 @@ async function route() {
     home()
   } catch (error) {
     if (version !== routeVersion) return
+    const cached = view === 'take' && readLocal('attempt-'+id,null)
+    if (!navigator.onLine && cached && hasSession()) { take(id,{...cached,offline:true}); return }
     if (!hasSession()) login()
     else if (dashboard && view) { await home(); notify(error.message, true) }
     else show(`<section class="panel empty"><h1>Could not open UnCooked</h1><p>${safe(error.message)}</p>
@@ -473,15 +514,20 @@ async function route() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && activeAttempt) examRequest('incident', {examId:activeAttempt.id,event:'page_hidden'}).catch(() => {})
+  if (document.hidden && activeAttempt && !activeAttempt.sandbox) examRequest('incident', {examId:activeAttempt.id,event:'page_hidden'}).catch(() => {})
 })
 addEventListener('beforeunload', event => {
   if (activeAttempt?.unsaved.size) event.preventDefault()
 })
-if (location.pathname === '/' && !/^#(?:create$|manage\/|take\/)/.test(location.hash)) {
+const verificationCode = new URLSearchParams(location.search).get('verify')
+if (verificationCode) {
+  verification(verificationCode,show,safe).catch(error => show('<p>'+safe(error.message)+'</p>'))
+} else if (location.pathname === '/' && !/^#(?:create$|manage\/|take\/)/.test(location.hash)) {
   showLanding()
 } else {
   if (location.pathname === '/') history.replaceState(null, '', '/login' + location.hash)
   addEventListener('hashchange', route)
   void route()
 }
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {})

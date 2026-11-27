@@ -42,3 +42,4 @@ backend/shared/*/data/
 /backend/
 /frontend/
 /.vercel/
+/tmp/

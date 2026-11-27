@@ -4,10 +4,13 @@ import './build.mjs'
 
 const files = new Map([
   ['/', ['index.html', 'text/html']],
+  ['/index.html', ['index.html', 'text/html']],
   ['/login', ['index.html', 'text/html']],
   ['/styles.css', ['styles.css', 'text/css']],
   ['/site.css', ['site.css', 'text/css']],
   ['/app.js', ['app.js', 'text/javascript']],
+  ['/sw.js', ['sw.js', 'text/javascript']],
+  ['/phase-three.js', ['phase-three.js', 'text/javascript']],
   ['/phase-two.js', ['phase-two.js', 'text/javascript']],
   ['/site.js', ['site.js', 'text/javascript']],
   ['/api.js', ['api.js', 'text/javascript']],

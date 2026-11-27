@@ -41,6 +41,10 @@ export function hasSession() {
   return Boolean(session)
 }
 
+export function userId() {
+  return session?.user?.id || 'signed-out'
+}
+
 export async function signIn(email, password) {
   acceptSession(await request('/auth/v1/token?grant_type=password', { email, password }))
 }
