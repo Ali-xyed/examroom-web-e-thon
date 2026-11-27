@@ -77,6 +77,10 @@ textarea { resize: vertical; }
 .form-actions { display: flex; justify-content: flex-end; align-items: center; gap: .8rem; margin-top: 1rem; flex-wrap: wrap; }
 .manage-grid, .attempt-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
 .attempt-grid.stacked { grid-template-columns: 1fr; }
+.import-record { border-top: 1px solid var(--line); padding-block: 1rem; }
+.import-record h3 { overflow-wrap: anywhere; }
+.import-record summary { cursor: pointer; }
+.import-record pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface); padding: .8rem; border-radius: .375rem; font-size: .875rem; }
 .attempt-sidebar details { margin-top: 1rem; }
 .attempt-sidebar summary { cursor: pointer; font-weight: 600; margin-bottom: .75rem; }
 .choice { font-size: inherit; }

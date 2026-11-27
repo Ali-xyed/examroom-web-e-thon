@@ -1,5 +1,6 @@
 import { examRequest, userId } from './api.js'
 import config from './config.js'
+import { bindImportPreview } from './import-preview.js'
 
 function storageKey(name) { return 'uncooked-' + userId() + '-' + name }
 export function readLocal(name, fallback) {
@@ -68,23 +69,12 @@ export async function phaseThree(view,id,{show,safe,notify,profile,take}) {
       [{prompt:'Which number is prime?',kind:'single',choices:['4','7','8','9'],correct:1,correctSet:[],marks:1,topic:'Mathematics',difficulty:'easy'}]
     show('<a class="back" href="#">Examinations</a><h1>Bulk import</h1><section class="panel form-panel"><p>'+
       (administrator?'Import candidate accounts. Each record needs a name, email, and password of at least 12 characters.':'Import question-bank records. Use single, multiple, or written for kind. Multiple-select requires correctSet indexes from 0 to 3.')+
-      '</p><p>Upload a JSON array with up to 200 records. An invalid row cancels the entire import.</p><button class="secondary" id="sample">Download sample JSON</button><form id="import-form"><label>JSON file<input type="file" accept=".json,application/json" required id="import-file"></label><button class="primary">Import records</button><p id="import-status" role="status"></p></form></section>')
+      '</p><p>Upload a JSON array with up to 200 records. Review the preview, then confirm the import.</p><button class="secondary" id="sample">Download sample JSON</button><form id="import-form"><label>JSON file<input type="file" accept=".json,application/json" required id="import-file"></label><section id="import-preview" aria-live="polite"></section><button class="primary" id="confirm-import" disabled>Confirm import</button><p id="import-status" role="status"></p></form></section>')
     document.querySelector('#sample').onclick=()=>{
       const url=URL.createObjectURL(new Blob([JSON.stringify(sample,null,2)],{type:'application/json'}))
       const a=document.createElement('a');a.href=url;a.download='import-sample.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000)
     }
-    document.querySelector('#import-form').onsubmit=async event=>{
-      event.preventDefault()
-      const button=event.currentTarget.querySelector('button');button.disabled=true
-      try{
-        const file=document.querySelector('#import-file').files[0]
-        if(file.size>1000000) throw new Error('Choose a JSON file smaller than 1 MB.')
-        const rows=JSON.parse(await file.text())
-        const result=await examRequest('bulk_import',{rows})
-        document.querySelector('#import-status').textContent=result.imported+' records imported.'
-      }catch(error){document.querySelector('#import-status').textContent=error.message}
-      finally{button.disabled=false}
-    }
+    bindImportPreview(administrator, safe, examRequest)
     return true
   }
   return false

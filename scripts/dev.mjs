@@ -11,6 +11,7 @@ const files = new Map([
   ['/app.js', ['app.js', 'text/javascript']],
   ['/sw.js', ['sw.js', 'text/javascript']],
   ['/phase-three.js', ['phase-three.js', 'text/javascript']],
+  ['/import-preview.js', ['import-preview.js', 'text/javascript']],
   ['/phase-two.js', ['phase-two.js', 'text/javascript']],
   ['/site.js', ['site.js', 'text/javascript']],
   ['/api.js', ['api.js', 'text/javascript']],
