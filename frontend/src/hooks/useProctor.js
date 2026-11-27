@@ -129,10 +129,15 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
         body: form,
         signal: AbortSignal.timeout(20000),
       })
-      if (!res.ok) throw new Error('Upload failed')
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => '')
+        console.error('[Proctor] Upload failed:', res.status, errBody)
+        throw new Error('Upload failed')
+      }
       // Clear from retry queue if present
       retryQueue.current = retryQueue.current.filter(r => r.captureId !== captureId)
-    } catch {
+    } catch (err) {
+      console.error('[Proctor] Upload error:', err?.message)
       // Add to retry queue if not already there
       if (!retryQueue.current.find(r => r.captureId === captureId)) {
         retryQueue.current.push({ captureId, blob, flags })
@@ -163,11 +168,16 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
 
     nextCaptureAt.current = Date.now() + delay
     captureTimerRef.current = setTimeout(async () => {
-      if (statusRef.current !== 'active') return
+      if (statusRef.current !== 'active') {
+        console.warn('[Proctor] Skipping capture — status:', statusRef.current)
+        return
+      }
       captureCount.current++
+      console.log('[Proctor] Capturing frame #', captureCount.current)
       const captureId = crypto.randomUUID()
       const frame = await captureFrame()
       const flags = frame?.canvas ? await analyzeFrame(frame.canvas) : ['no_face']
+      console.log('[Proctor] Frame captured, blob size:', frame?.blob?.size, 'flags:', flags)
       if (frame?.blob) {
         await uploadCapture({ captureId, blob: frame.blob, flags })
       } else {

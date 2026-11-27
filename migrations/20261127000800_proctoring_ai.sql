@@ -490,9 +490,14 @@ begin
     if a.id is not null then
       if operation in ('start', 'resume') then
         result := result || jsonb_build_object('attemptId', a.id);
+        -- Always inject proctoring_mode so the client knows whether to enable camera
+        select * into e from examroom.exams where id = a.exam_id;
+        result := result || jsonb_build_object('proctoring_mode', e.proctoring_mode);
       end if;
       if a.submitted_at is null and a.deadline > clock_timestamp() then
-        select * into e from examroom.exams where id = a.exam_id;
+        if e.id is null then
+          select * into e from examroom.exams where id = a.exam_id;
+        end if;
         if e.proctoring_mode = 'snapshots' then
           next_cap := clock_timestamp()
                       + make_interval(secs => 120 + floor(random() * 240)::int);
