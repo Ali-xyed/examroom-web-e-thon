@@ -9,7 +9,11 @@ export default function AuditView({ notify }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    examRequest('audit', { examId: id })
+    setLoading(true)
+    const call = id
+      ? examRequest('audit', { examId: id })
+      : examRequest('admin_audit')
+    call
       .then(setRows)
       .catch(err => notify(err.message, true))
       .finally(() => setLoading(false))
@@ -17,14 +21,18 @@ export default function AuditView({ notify }) {
 
   return (
     <div>
-      <Breadcrumb back="Back to Disputes" backHref={`/workspace/disputes/${id}`} current="Audit log" />
+      <Breadcrumb
+        back={id ? 'Back to Disputes' : 'Back to Overview'}
+        backHref={id ? `/workspace/disputes/${id}` : '/workspace'}
+        current="Audit log"
+      />
       <PageHeader title="Immutable audit log" description="Append-only history. Latest 500 records." />
       {loading ? <p className="text-muted">Loading…</p> : (
         <Panel>
           {rows.length === 0 ? <p className="text-muted text-sm">No changes recorded yet.</p> : rows.map(row => (
             <details key={row.id} className="border-b border-line last:border-0 py-3">
               <summary className="cursor-pointer text-sm font-medium">
-                {row.action} · {row.actor || 'System'} · {new Date(row.created_at).toLocaleString()} · #{row.id}
+                {row.action}{row.exam_title ? ` · ${row.exam_title}` : ''} · {row.actor || 'System'} · {new Date(row.created_at).toLocaleString()} · #{row.id}
               </summary>
               <div className="mt-2 grid grid-cols-2 gap-3">
                 <div>

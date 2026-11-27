@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { examRequest } from '../api.js'
+import { examRequest, sessionToken } from '../api.js'
 import { readLocal, writeLocal, removeLocal } from '../localStore.js'
 import { integrityCapture, loadRecord, storeRecord } from '../attemptStore.js'
 import { Button, useNotice, Notice } from '../components/ui.jsx'
+import { useProctor } from '../hooks/useProctor.js'
+import ProctorConsent from '../components/ProctorConsent.jsx'
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -48,6 +50,21 @@ export default function TakeExamPage() {
   const syncedAtRef = useRef(performance.now())
   const nextPollRef = useRef(0)
   const checkingExpiryRef = useRef(false)
+
+  // Proctoring state
+  const [showConsent, setShowConsent] = useState(false)
+  const [proctorReady, setProctorReady] = useState(false)
+  const isProctored = useRef(false)
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+
+  // Initialize proctor hook
+  const proctor = useProctor({
+    examId: id,
+    attemptId: data?.attemptId || '',
+    enabled: isProctored.current && proctorReady && !isSandbox.current,
+    apiUrl: API_URL,
+    getToken: sessionToken,
+  })
 
   // Load attempt
   useEffect(() => {
@@ -107,6 +124,15 @@ export default function TakeExamPage() {
 
         setQuestions(qs)
         setData(attemptData)
+
+        // Proctoring setup
+        const mode = attemptData.proctoring_mode || attemptData.exam?.proctoring_mode
+        if (mode === 'snapshots' && !sandbox) {
+          isProctored.current = true
+          setShowConsent(true) // show consent before starting
+        } else {
+          setProctorReady(true) // no proctoring, skip
+        }
 
         // Calculate remaining time
         const r =
@@ -197,10 +223,24 @@ export default function TakeExamPage() {
     return () => {
       clearInterval(timerRef.current)
       cleanupRef.current?.()
+      proctor.stop()
       window.removeEventListener('online', reconnect)
       window.removeEventListener('offline', connectionLost)
     }
   }, [data, submitted])
+
+  // Consent handlers
+  function handleConsentGranted() {
+    setShowConsent(false)
+    setProctorReady(true)
+    proctor.startCamera().then(() => proctor.scheduleNext())
+  }
+
+  function handleConsentDenied() {
+    setShowConsent(false)
+    setProctorReady(true) // allow exam to continue
+    proctor.recordMissed?.(['camera_denied'])
+  }
 
   function handleSubmitResponse(response) {
     if (!response.submittedAt) return false
@@ -247,6 +287,10 @@ export default function TakeExamPage() {
             setQuestions(prev => prev.map(prevQ => prevQ.id === q.id ? { ...prevQ, ...updated } : prevQ))
           }
           notify('A newer answer was already accepted.')
+        }
+        // Check for server-scheduled next capture
+        if (response?.next_capture_at) {
+          proctor.setNextCaptureFromServer(response.next_capture_at)
         }
         remainingRef.current = Date.parse(data.deadline) - Date.parse(response.serverTime)
         syncedAtRef.current = performance.now()
@@ -339,6 +383,16 @@ export default function TakeExamPage() {
 
   return (
     <div className="attempt-shell min-h-screen bg-white">
+      {/* Hidden video element for snapshot capture */}
+      <video ref={proctor.videoRef} autoPlay muted playsInline className="hidden" aria-hidden="true" />
+      {/* Proctor consent modal */}
+      {showConsent && !submitted && !loadError && (
+        <ProctorConsent
+          onConsented={handleConsentGranted}
+          onDenied={handleConsentDenied}
+        />
+      )}
+
       {/* Top bar */}
       <header className="sticky top-0 z-10 bg-white/95 border-b border-line backdrop-blur-md">
         <div className="w-full max-w-[1160px] mx-auto px-6 min-h-[3.45rem] flex gap-4 justify-between items-center">
@@ -347,6 +401,9 @@ export default function TakeExamPage() {
           <div className={`text-center border border-line rounded-lg px-3 py-1.5 min-w-[7rem] ${lowTime ? 'text-error' : ''}`}>
             <div className="text-xs text-muted">Time remaining</div>
             <strong className="text-lg tabular-nums">{mins}:{secs}</strong>
+            {isProctored.current && proctorReady && (
+              <span className="text-xs text-muted ml-3">Camera active</span>
+            )}
           </div>
         </div>
       </header>

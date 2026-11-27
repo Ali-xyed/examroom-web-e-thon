@@ -14,6 +14,8 @@ function Icon({ name }) {
     case 'logout': return <svg {...props}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
     case 'collapse': return <svg {...props}><polyline points="11 17 6 12 11 7" /><polyline points="18 17 13 12 18 7" /></svg>
     case 'expand': return <svg {...props}><polyline points="13 17 18 12 13 7" /><polyline points="6 17 11 12 6 7" /></svg>
+    case 'ai': return <svg {...props}><path d="M12 2a10 10 0 1 0 10 10" /><path d="M12 8v4l3 3" /><circle cx="18" cy="8" r="3" /></svg>
+    case 'audit': return <svg {...props}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
     default: return null
   }
 }
@@ -36,12 +38,16 @@ export default function WorkspaceSidebar({ profile, online, collapsed, onToggleC
           { to: '/workspace', label: 'Overview', icon: 'exams', exact: true },
           { to: '/workspace/users', label: 'Manage users', icon: 'users' },
           { to: '/workspace/import', label: 'Bulk import', icon: 'import' },
+          { to: '/workspace/audit', label: 'Audit log', icon: 'audit' },
         ]
-      : [{ to: '/workspace', label: 'My examinations', icon: 'exams', exact: true }]
+      : [
+          { to: '/workspace', label: 'My examinations', icon: 'exams', exact: true },
+          { to: '/workspace/ai-prep', label: 'AI Study', icon: 'ai' },
+        ]
 
   function isActive(item) {
     if (item.exact) {
-      return pathname === '/workspace' || (pathname.startsWith('/workspace/') && !['/workspace/bank', '/workspace/create', '/workspace/import', '/workspace/users', '/workspace/settings'].some(p => pathname.startsWith(p)))
+      return pathname === '/workspace' || (pathname.startsWith('/workspace/') && !['/workspace/bank', '/workspace/create', '/workspace/import', '/workspace/users', '/workspace/settings', '/workspace/ai-prep', '/workspace/audit'].some(p => pathname.startsWith(p)))
     }
     return pathname.startsWith(item.to)
   }

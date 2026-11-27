@@ -12,6 +12,8 @@ export default function ManageExamView({ notify, profile }) {
   const [enrollError, setEnrollError] = useState('')
   const [enrollBusy, setEnrollBusy] = useState(false)
   const [publishBusy, setPublishBusy] = useState(false)
+  const [proctoringMode, setProctoringMode] = useState('off')
+  const [savingSettings, setSavingSettings] = useState(false)
 
   const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
   function date(value) { return dateFormat.format(new Date(value)) }
@@ -21,10 +23,24 @@ export default function ManageExamView({ notify, profile }) {
     try {
       const result = await examRequest('manage', { examId: id })
       setData(result)
+      setProctoringMode(result?.exam?.proctoring_mode || 'off')
     } catch (err) {
       notify(err.message, true)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleProctoringChange(mode) {
+    setProctoringMode(mode)
+    setSavingSettings(true)
+    try {
+      await examRequest('exam_settings', { examId: id, proctoring_mode: mode })
+      notify(`Proctoring set to ${mode}.`)
+    } catch (err) {
+      notify(err.message, true)
+    } finally {
+      setSavingSettings(false)
     }
   }
 
@@ -81,6 +97,8 @@ export default function ManageExamView({ notify, profile }) {
       {/* Exam tools */}
       <div className="flex flex-wrap gap-2 mb-6">
         <Link to={`/workspace/monitor/${id}`} className="btn-secondary">Monitor and grade</Link>
+        <Link to={`/workspace/leaderboard/${id}`} className="btn-secondary">Leaderboard</Link>
+        <Link to={`/workspace/proctor/${id}`} className="btn-secondary">Integrity review</Link>
         <Link to={`/workspace/analytics/${id}`} className="btn-secondary">Question analytics</Link>
         <Link to={`/workspace/sandbox/${id}`} className="btn-secondary">Preview as candidate</Link>
         <Link to={`/workspace/disputes/${id}`} className="btn-secondary">Disputes</Link>
@@ -97,7 +115,25 @@ export default function ManageExamView({ notify, profile }) {
             ['Closes', date(exam.closes_at)],
             ['Duration', `${exam.duration} min`],
             ['Total marks', totalMarks],
+            ['Proctoring', proctoringMode === 'snapshots' ? 'Snapshots' : 'Off'],
           ]} />
+          <div className="mb-4 flex items-center gap-3">
+            <label className="text-xs text-muted font-medium">
+              Proctoring mode:
+              <select
+                className="form-select ml-2 text-xs py-1 inline-block w-auto"
+                value={proctoringMode}
+                disabled={savingSettings}
+                onChange={e => handleProctoringChange(e.target.value)}
+              >
+                <option value="off">Off</option>
+                <option value="snapshots">Snapshots</option>
+              </select>
+            </label>
+          </div>
+          {exam.description && (
+            <p className="text-sm text-muted whitespace-pre-wrap mb-2">{exam.description}</p>
+          )}
           {exam.instructions && (
             <p className="text-sm whitespace-pre-wrap mb-4">{exam.instructions}</p>
           )}

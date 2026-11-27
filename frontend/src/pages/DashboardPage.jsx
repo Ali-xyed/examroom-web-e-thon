@@ -21,6 +21,9 @@ import AuditView from '../views/AuditView.jsx'
 import FairnessView from '../views/FairnessView.jsx'
 import DatesheetView from '../views/DatesheetView.jsx'
 import SettingsView from '../views/SettingsView.jsx'
+import AIPrepView from '../views/AIPrepView.jsx'
+import LeaderboardView from '../views/LeaderboardView.jsx'
+import ProctorView from '../views/ProctorView.jsx'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -138,9 +141,13 @@ export default function DashboardPage() {
             <Route path="analytics/:id" element={<AnalyticsView notify={notify} />} />
             <Route path="sandbox/:id" element={<SandboxView notify={notify} profile={profile} dashboard={dashboard} />} />
             <Route path="disputes/:id" element={<DisputesView notify={notify} profile={profile} />} />
+            <Route path="audit" element={<AuditView notify={notify} />} />
             <Route path="audit/:id" element={<AuditView notify={notify} />} />
             <Route path="fairness/:id" element={<FairnessView notify={notify} />} />
             <Route path="datesheet/:id" element={<DatesheetView notify={notify} />} />
+            <Route path="ai-prep" element={<AIPrepView notify={notify} dashboard={dashboard} profile={profile} />} />
+            <Route path="leaderboard/:id" element={<LeaderboardView notify={notify} profile={profile} />} />
+            <Route path="proctor/:id" element={<ProctorView notify={notify} profile={profile} />} />
           </Routes>
         </main>
       </div>

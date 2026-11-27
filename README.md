@@ -133,3 +133,20 @@ All 7 original Supabase SQL migrations are copied here verbatim. Apply them in f
 | PDF generation | jsPDF loaded dynamically | Same (jsPDF loaded on demand) |
 | Offline resilience | localStorage + IndexedDB | Same logic ported to React hooks |
 | Service Worker | sw.js | Vite PWA plugin can be added optionally |
+
+---
+
+## Integrity Challenge 5.1: Random-Snapshot Proctoring & Privacy Design
+
+ExamRoom implements an optional, privacy-first random-snapshot proctoring mode (`exams.proctoring_mode = 'snapshots'`) designed to fit within Supabase's 1 GB free storage tier while never blocking candidate answering, autosave, or submission.
+
+### Privacy & Storage Design
+- **Explicit Consent & Camera Check**: Before starting a proctored exam, candidates see a clear notice detailing what is captured, who can view it (only the exam's examiner/admin), and that images are deleted upon review. If camera access is denied or unavailable, the exam continues normally and a `missed` capture row is recorded.
+- **On-Device Analysis**: Face presence (`no_face`, `multiple_faces`, `face_off_center`) is evaluated client-side using the browser's `FaceDetector` API (with a lightweight canvas fallback) — zero third-party or paid vision APIs are used.
+- **Low-Resolution Compression**: Frames are downscaled to max `480x360` JPEG at quality `0.5` (~15–40 KB each) and uploaded through an authenticated Express endpoint (`/api/proctor/upload`) that enforces `<= 100 KB`, `image/jpeg`, and active attempt validation using the Supabase service role key server-side.
+- **Server-Scheduled Intervals**: `next_capture_at` (random 2–6 minutes) is returned by the server on `start`, `resume`, `save`, and `heartbeat`. Failed uploads are queued in memory and retried in the background.
+- **Delete-on-Review & Retention Limit**: Marking a capture as `reviewed` deletes the image from the private `proctor-captures` bucket first and only then updates the database (`image_deleted_at = now()`, `storage_path = null`), preserving flags and audit logs. Escalated captures are retained for dispute resolution. A `pg_cron` job (and `/api/proctor/cleanup` endpoint) purges pending captures older than 14 days on published exams.
+
+### Trade-offs
+- **False Positives**: Lighting changes, camera angles, or browser fallback heuristics can trigger `no_face` or `face_off_center` flags. All UI copy labels these as **indicators / triage aids**, never as conclusive evidence.
+- **Camera Access**: Candidates without a webcam or who deny permission are not locked out of their exam; their `missed` status is surfaced to the examiner for human judgment.
