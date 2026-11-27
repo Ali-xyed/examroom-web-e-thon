@@ -20,16 +20,17 @@ Candidates can download verified PDF reports from their published results. Exami
 
 The exam workspace includes text-size and layout preferences, plus a scratchpad saved in the browser. Preferences and scratchpad storage are scoped to the signed-in account. The application caches its exam shell for offline refresh after a successful first load. Pending answers are saved locally and retried after reconnection. Revision numbers prevent an older retry from overwriting a newer accepted answer. The original server deadline remains authoritative, and local changes arriving after expiry are rejected.
 
-The failure-resilience innovation addresses network interruptions and refreshes on the same browser. Recovery requires that the candidate has previously loaded the exam online and retained browser storage. A failed device's unsynchronized local work cannot be recovered on another device. PDF text currently supports the basic Latin character set.
+The failure-resilience innovation addresses network interruptions and refreshes on the same browser. Recovery requires that the candidate has previously loaded the exam online and retained browser storage. A failed device's unsynchronized local work cannot be recovered on another device. PDF reports embed DejaVu Sans for accented names and paginate large summaries. Font coverage and script shaping depend on the embedded font and renderer.
 
 Run `node --env-file=.env scripts/phase-three-smoke.mjs` for import, sandbox, revision, analytics, and report-verification checks. It uses the separate fictional `phase3-admin@examroom.example` QA account.
 
 ## Local setup
 
-1. Use Node.js 22 or newer and a Supabase project. Apply the migration in `supabase/migrations`.
-2. In Supabase Authentication, create and confirm the fictional users below. Run `supabase/demo-roles.sql` to assign their application roles.
+1. Use Node.js 22 and a Supabase project. Apply all migrations in `supabase/migrations` in filename order, then run `npm ci`.
+2. In Supabase Authentication, create and confirm the four original fictional users below and `phase3-admin@examroom.example`. Run `supabase/demo-roles.sql` to assign their application roles. Set the same QA password on these accounts for the verification scripts.
 3. Copy `.env.example` to `.env` and enter the project URL, publishable key, and password used for the fictional accounts.
 4. Run `npm run dev`. Open the local URL printed in the terminal.
+5. Optionally run `node --env-file=.env scripts/seed-demo.mjs` to create the judge demonstration accounts and four prepared exam states. This uses the configured QA administrator and only creates demo accounts and exams that do not already exist.
 
 | Role | Fictional account |
 | --- | --- |
@@ -38,7 +39,18 @@ Run `node --env-file=.env scripts/phase-three-smoke.mjs` for import, sandbox, re
 | Candidate | `candidate@examroom.example` |
 | Unenrolled candidate for access checks | `visitor@examroom.example` |
 
-The password for the hosted demo is shared with the team privately.
+### Hosted judge demonstration accounts
+
+All four accounts below use the password `UnCooked-Demo-2026!`.
+
+| Role | Account |
+| --- | --- |
+| Administrator | `demo-admin@uncooked.example` |
+| Examiner | `demo-examiner@uncooked.example` |
+| Candidate | `demo-candidate@uncooked.example` |
+| Unenrolled candidate | `demo-visitor@uncooked.example` |
+
+These accounts are fictional and intended for evaluation. Existing team test accounts are separate. Do not use the demonstration environment for real candidate information.
 
 ## Verify Phase 1
 
@@ -52,3 +64,34 @@ The password for the hosted demo is shared with the team privately.
 ## Deploy
 
 Import this repository into Vercel. Set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` as build variables. Vercel runs `npm run build` and serves `dist`. Deployments only need the publishable key. Supabase Auth handles sessions, and the database checks roles, exam ownership, enrollment, and the attempt deadline on the server.
+
+
+## Submission
+
+- Live application https://examroom-web-e-thon.vercel.app/
+- Sign-in https://examroom-web-e-thon.vercel.app/login
+- Source repository https://github.com/Ali-xyed/examroom-web-e-thon
+- Runtime Node.js 22, browser JavaScript, Supabase Auth and PostgreSQL, Vercel static hosting. PDF generation uses locally bundled jsPDF and DejaVu Sans. No paid API is required.
+- Original source migrations and version history are included. The repository is private, so judges need repository access or a source export through the submission process.
+
+## Fifteen-minute demonstration
+
+| Minutes | Demonstration |
+| --- | --- |
+| 0–2 | Open the homepage, sign in as the demo admin, show roles, account creation and the password toggle. |
+| 2–4 | Sign in as the demo examiner. Open the draft preview exam, show the bank and assigned question types, then preview as candidate. |
+| 4–8 | Use the demo candidate to open “Web fundamentals · take an exam”. Answer a question, flag it, change text size, and use the scratchpad. Disconnect the browser, change an answer, refresh, and reconnect before the deadline. Show pending status becoming saved and the original timer continuing. |
+| 8–10 | Open “Written assessment · awaiting grading” as the examiner. Grade the response within its maximum, review totals, then publish. |
+| 10–12 | Open “Web fundamentals · published result” as the candidate, download the PDF, and verify its code in a signed-out browser. |
+| 12–14 | Show question analytics and import preview. Use the sample JSON and demonstrate an invalid row before confirming a valid import. |
+| 14–15 | Show the unenrolled demo visitor has no assigned exams. Explain server timing, locked published question copies, exact-match multiple-select marking, and the offline recovery trade-off. |
+
+The four demo exams are preloaded under the demo examiner and candidate. A real attempt can be submitted once. Create another fictional exam for repeated rehearsals. The server closes the demonstration windows after 72 hours from seeding. The development submission must be finalized before the organizer's deadline. Complete all commits, pushes, builds, and deployments before the cutoff.
+
+## Verification and architecture
+
+Run `npm run check`, `npm run build`, `npm run smoke`, `node --env-file=.env scripts/phase-two-smoke.mjs`, `node --env-file=.env scripts/phase-three-smoke.mjs`, and `npm run verify:final`. Integration checks create fictional records in the configured project. The QA admin defaults to `phase3-admin@examroom.example`; set `EXAMROOM_TEST_ADMIN_EMAIL` to another authorized QA administrator when needed. All QA actors need the password configured in `EXAMROOM_DEMO_PASSWORD`.
+
+The browser calls one authenticated database RPC. The RPC checks account status, role, ownership, enrollment and timing. Private tables have RLS enabled and no direct client access. Earlier RPC versions are executable only internally. The separate public report RPC returns authenticity and issue time only. Supabase's security advisor flags these intentional SECURITY DEFINER entry points and the private tables with no client policies. Leaked-password screening is disabled on this project and remains an authentication configuration limitation.
+
+Expiry is checked on each write and by a database worker every minute. Attempts retain the original exam questions and marks. Browser incidents are review signals. Monitoring is refreshed manually. Offline recovery requires the same browser storage after an initial online exam load. Unsynced work cannot be recovered on a failed device from another device.

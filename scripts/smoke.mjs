@@ -17,7 +17,7 @@ async function post(path, body, token) {
 
 async function actor(name) {
   const session = await post('/auth/v1/token?grant_type=password', {
-    email: name + '@examroom.example', password,
+    email: name === 'admin' ? (process.env.EXAMROOM_TEST_ADMIN_EMAIL || 'phase3-admin@examroom.example') : name + '@examroom.example', password,
   })
   return (operation, payload = {}) =>
     post('/rest/v1/rpc/examroom_request', { operation, payload }, session.access_token)

@@ -132,7 +132,7 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
     }
     document.querySelector('#publish-results').onclick=()=>action('publish_results',{examId:id,published:!data.published},refresh)
     document.querySelector('#report').onclick=async()=>{
-      try { downloadReport(await examRequest('report',{examId:id})) } catch(error) { notify(error.message,true) }
+      try { await downloadReport(await examRequest('report',{examId:id})) } catch(error) { notify(error.message,true) }
     }
     document.querySelectorAll('[data-grade]').forEach(form=>form.onsubmit=event=>{
       event.preventDefault(); action('grade',{examId:id,attemptId:form.dataset.grade,questionId:form.dataset.question,grade:new FormData(form).get('grade')},refresh)
@@ -148,7 +148,7 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
     if(reportButton) reportButton.onclick=async()=>{
       try {
         const report=await examRequest('report',{examId:id})
-        downloadReport(report)
+        await downloadReport(report)
         document.querySelector('#report-verification').innerHTML='<a target="_blank" rel="noopener" href="/?verify='+report.token+'">Verify this report</a>'
       }catch(error){notify(error.message,true)}
     }

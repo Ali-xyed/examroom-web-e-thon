@@ -12,4 +12,7 @@ if (!key?.startsWith('sb_publishable_')) {
 
 await mkdir('dist', { recursive: true })
 await cp('public', 'dist', { recursive: true })
+await mkdir('dist/vendor', {recursive:true})
+await cp('node_modules/jspdf/dist/jspdf.umd.min.js', 'dist/vendor/jspdf.umd.min.js')
+await cp('node_modules/jspdf/LICENSE', 'dist/vendor/jspdf.LICENSE')
 await writeFile('dist/config.js', 'export default ' + JSON.stringify({ url, key }) + '\n')

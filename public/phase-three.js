@@ -11,40 +11,7 @@ export function writeLocal(name, value) {
 }
 export function removeLocal(name) { localStorage.removeItem(storageKey(name)) }
 
-export function downloadReport(report) {
-  const lines = ['UnCooked examination report', report.title, new Date().toLocaleString()]
-  if (report.examiner) {
-    lines.push('Examiner summary')
-    for (const score of report.scores) lines.push(score.name + ' | ' + score.score + '/' + score.total + ' | Pending written grades: ' + score.pending)
-  } else {
-    lines.push(report.name, 'Score: ' + report.score + ' / ' + report.total,
-      'Verification code: ' + report.token,
-      location.origin + '/?verify=' + report.token)
-  }
-  const clean = text => String(text).normalize('NFKD').replace(/[^\x20-\x7e]/g, '?').replace(/[\\()]/g, '\\$&')
-  const wrapped = lines.flatMap(line => String(line).match(/.{1,88}/g) || [''])
-  const pages = []
-  for (let i=0; i<wrapped.length; i+=42) pages.push(wrapped.slice(i,i+42))
-  const objects = ['<< /Type /Catalog /Pages 2 0 R >>','', '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>']
-  const pageIds = []
-  for (const page of pages) {
-    const id = objects.length+1
-    pageIds.push(id)
-    const stream = 'BT /F1 11 Tf 45 790 Td 17 TL ' + page.map((line,i)=>(i?'T* ':'')+'('+clean(line)+') Tj').join('\n') + ' ET'
-    objects.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents '+(id+1)+' 0 R >>')
-    objects.push('<< /Length '+stream.length+' >>\nstream\n'+stream+'\nendstream')
-  }
-  objects[1]='<< /Type /Pages /Count '+pages.length+' /Kids ['+pageIds.map(id=>id+' 0 R').join(' ')+'] >>'
-  let pdf='%PDF-1.4\n'
-  const offsets=[0]
-  objects.forEach((object,i)=>{ offsets.push(pdf.length); pdf+=(i+1)+' 0 obj\n'+object+'\nendobj\n' })
-  const xref=pdf.length
-  pdf+='xref\n0 '+offsets.length+'\n0000000000 65535 f \n'+offsets.slice(1).map(n=>String(n).padStart(10,'0')+' 00000 n \n').join('')
-  pdf+='trailer << /Size '+offsets.length+' /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF'
-  const url=URL.createObjectURL(new Blob([pdf],{type:'application/pdf'}))
-  const a=document.createElement('a'); a.href=url; a.download='UnCooked-report.pdf'; a.click()
-  setTimeout(()=>URL.revokeObjectURL(url),10000)
-}
+export { downloadReport } from './report-pdf.js'
 
 export async function verification(code, show, safe) {
   const response=await fetch(config.url+'/rest/v1/rpc/verify_report',{method:'POST',headers:{apikey:config.key,'Content-Type':'application/json'},body:JSON.stringify({code})})

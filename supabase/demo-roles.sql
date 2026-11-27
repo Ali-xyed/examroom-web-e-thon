@@ -7,5 +7,6 @@ join (values
   ('examiner@examroom.example', 'Samira Khan', 'examiner'),
   ('candidate@examroom.example', 'Ayaan Malik', 'candidate'),
   ('visitor@examroom.example', 'Zoya Ahmed', 'candidate')
+  ,('phase3-admin@examroom.example', 'QA Administrator', 'administrator')
 ) as demo(email, name, role) on demo.email = users.email
 on conflict (id) do update set name = excluded.name, role = excluded.role;
