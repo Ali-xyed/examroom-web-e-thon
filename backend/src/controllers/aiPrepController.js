@@ -20,7 +20,7 @@ export async function chatPrep(req, res) {
       body: JSON.stringify({
         model: MODEL,
         messages,
-        max_tokens: 1024,
+        max_tokens: 4096,
         temperature: 0.7,
       }),
     })

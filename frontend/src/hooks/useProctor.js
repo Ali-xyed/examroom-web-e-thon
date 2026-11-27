@@ -14,14 +14,18 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
 
   // Start camera
   const startCamera = useCallback(async () => {
-    if (!enabled) return
+    if (!enabled) return false
+    if (streamRef.current && statusRef.current === 'active') return true
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 480, height: 360, facingMode: 'user' },
         audio: false,
       })
       streamRef.current = stream
-      if (videoRef.current) videoRef.current.srcObject = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play().catch(() => {})
+      }
       statusRef.current = 'active'
       return true
     } catch {
@@ -34,12 +38,12 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
   const captureFrame = useCallback(async () => {
     if (!streamRef.current || !enabled) return null
     try {
+      const video = videoRef.current
+      if (!video || video.readyState < 2) return null
       const canvas = document.createElement('canvas')
       canvas.width = 480
       canvas.height = 360
       const ctx = canvas.getContext('2d')
-      const video = videoRef.current
-      if (!video) return null
       ctx.drawImage(video, 0, 0, 480, 360)
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.5))
       return { blob, canvas }
@@ -138,14 +142,19 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
 
   // Forward-declare scheduleNext so it can reference itself in setTimeout
   const scheduleNextRef = useRef(null)
+  const hasCapturedInitial = useRef(false)
 
-  // Schedule next capture at a random 2-6 min interval
-  const scheduleNext = useCallback(() => {
+  // Schedule next capture: initial capture after 8s so short quizzes are covered, then random 2-6 min
+  const scheduleNext = useCallback((isInitial = false) => {
     if (!enabled || statusRef.current === 'stopped') return
-    const delay = (120 + Math.random() * 240) * 1000 // 2-6 min in ms
+    clearTimeout(captureTimerRef.current)
+    const delay = isInitial && !hasCapturedInitial.current
+      ? 8000
+      : (120 + Math.random() * 240) * 1000 // 2-6 min in ms
     nextCaptureAt.current = Date.now() + delay
     captureTimerRef.current = setTimeout(async () => {
       if (statusRef.current !== 'active') return
+      hasCapturedInitial.current = true
       const captureId = crypto.randomUUID()
       const frame = await captureFrame()
       const flags = frame?.canvas ? await analyzeFrame(frame.canvas) : ['no_face']
@@ -155,9 +164,9 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
         await recordMissed(['no_face'])
       }
       // Schedule next via ref to avoid stale closure issues
-      scheduleNextRef.current?.()
+      scheduleNextRef.current?.(false)
     }, delay)
-  }, [enabled, captureFrame, analyzeFrame, uploadCapture, getToken, apiUrl, examId, attemptId])
+  }, [enabled, captureFrame, analyzeFrame, uploadCapture, recordMissed])
 
   // Keep the ref up to date
   scheduleNextRef.current = scheduleNext
@@ -183,9 +192,9 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
     if (videoRef.current) videoRef.current.srcObject = null
   }, [])
 
-  // Update nextCaptureAt from server heartbeat response
+  // Update nextCaptureAt from server heartbeat response (after initial capture is done)
   const setNextCaptureFromServer = useCallback((serverTimestamp) => {
-    if (!serverTimestamp || !enabled) return
+    if (!serverTimestamp || !enabled || !hasCapturedInitial.current) return
     const serverTime = new Date(serverTimestamp).getTime()
     if (serverTime > Date.now()) {
       clearTimeout(captureTimerRef.current)
@@ -201,7 +210,7 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
         } else {
           await recordMissed(['no_face'])
         }
-        scheduleNextRef.current?.()
+        scheduleNextRef.current?.(false)
       }, delay)
     }
   }, [enabled, captureFrame, analyzeFrame, uploadCapture, recordMissed])

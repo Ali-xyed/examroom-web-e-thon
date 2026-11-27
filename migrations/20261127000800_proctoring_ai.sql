@@ -365,7 +365,7 @@ begin
           (s->>'score')::numeric as sc,
           (s->>'total')::numeric as tot,
           row_number() over (order by (s->>'score')::numeric desc, pr.name) as rn,
-          round(100.0 * percent_rank() over (order by (s->>'score')::numeric), 1) as pct
+          round((100.0 * percent_rank() over (order by (s->>'score')::numeric))::numeric, 1) as pct
         from jsonb_array_elements(examroom.scores(eid)) s
         join examroom.profiles pr on pr.id = (s->>'candidate_id')::uuid
       ) t
@@ -399,15 +399,15 @@ begin
 
     select
       count(*) filter (where (s->>'score')::numeric > score_val) + 1,
-      round(100.0 * count(*) filter (where (s->>'score')::numeric < score_val)
-            / nullif(total_cands, 0), 1)
+      round((100.0 * count(*) filter (where (s->>'score')::numeric < score_val)
+            / nullif(total_cands, 0))::numeric, 1)
     into rank_val, pctile
     from jsonb_array_elements(examroom.scores(eid)) s;
 
     return jsonb_build_object(
       'score',            score_val,
       'total',            total_val,
-      'classAvg',         round(avg_val, 2),
+      'classAvg',         round(avg_val::numeric, 2),
       'percentile',       coalesce(pctile, 0),
       'rank',             rank_val,
       'totalCandidates',  total_cands
@@ -431,7 +431,7 @@ begin
 
     return jsonb_build_object(
       'exam', jsonb_build_object('id', e.id, 'title', e.title, 'description', e.description),
-      'classAvg', round(coalesce(avg_val, 0), 2),
+      'classAvg', round(coalesce(avg_val, 0)::numeric, 2),
       'totalCandidates', coalesce(total_cands, 0),
       'candidates', (
         select coalesce(jsonb_agg(
@@ -442,7 +442,7 @@ begin
             'score',      (s->>'score')::numeric,
             'total',      (s->>'total')::numeric,
             'rank',       (select count(*) + 1 from jsonb_array_elements(examroom.scores(eid)) s2 where (s2->>'score')::numeric > (s->>'score')::numeric),
-            'percentile', round(100.0 * (select count(*) from jsonb_array_elements(examroom.scores(eid)) s2 where (s2->>'score')::numeric < (s->>'score')::numeric) / nullif(total_cands, 0), 1)
+            'percentile', round((100.0 * (select count(*) from jsonb_array_elements(examroom.scores(eid)) s2 where (s2->>'score')::numeric < (s->>'score')::numeric) / nullif(total_cands, 0))::numeric, 1)
           )
         ), '[]')
         from jsonb_array_elements(examroom.scores(eid)) s

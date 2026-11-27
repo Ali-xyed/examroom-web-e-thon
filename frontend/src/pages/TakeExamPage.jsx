@@ -230,10 +230,17 @@ export default function TakeExamPage() {
   }, [data, submitted])
 
   // Consent handlers
+  useEffect(() => {
+    if (isProctored.current && proctorReady && !isSandbox.current && !submitted && data?.attemptId) {
+      proctor.startCamera().then((ok) => {
+        if (ok) proctor.scheduleNext(true)
+      })
+    }
+  }, [proctorReady, submitted, data?.attemptId])
+
   function handleConsentGranted() {
     setShowConsent(false)
     setProctorReady(true)
-    proctor.startCamera().then(() => proctor.scheduleNext())
   }
 
   function handleConsentDenied() {
