@@ -51,6 +51,7 @@ revoke all on examroom.proctor_captures from public, anon, authenticated;
 grant select, insert, update on examroom.proctor_captures to authenticated;
 
 -- Candidates: INSERT only for their own active attempt
+drop policy if exists proctor_captures_candidate_insert on examroom.proctor_captures;
 create policy proctor_captures_candidate_insert
   on examroom.proctor_captures
   for insert
@@ -69,6 +70,7 @@ create policy proctor_captures_candidate_insert
 -- Candidates: NO SELECT (no policy = no access)
 
 -- Examiners / admins: SELECT + UPDATE
+drop policy if exists proctor_captures_examiner_select on examroom.proctor_captures;
 create policy proctor_captures_examiner_select
   on examroom.proctor_captures
   for select
@@ -84,6 +86,7 @@ create policy proctor_captures_examiner_select
     )
   );
 
+drop policy if exists proctor_captures_examiner_update on examroom.proctor_captures;
 create policy proctor_captures_examiner_update
   on examroom.proctor_captures
   for update
@@ -107,10 +110,18 @@ create policy proctor_captures_examiner_update
 --   supabase storage buckets create proctor-captures --private
 
 -- ============================================================
--- 5. Extend examroom_request (replace wrapper — previous version renamed to examroom_v5)
+-- 5. Extend examroom_request (replace wrapper — previous version renamed to examroom_v7)
 -- ============================================================
-alter function public.examroom_request(text, jsonb) rename to examroom_v5;
-revoke all on function public.examroom_v5(text, jsonb) from public, anon, authenticated;
+do $$ begin
+  if not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'examroom_v7'
+  ) then
+    alter function public.examroom_request(text, jsonb) rename to examroom_v7;
+  end if;
+end $$;
+revoke all on function public.examroom_v7(text, jsonb) from public, anon, authenticated;
 
 create or replace function public.examroom_request(
   operation text,
@@ -145,7 +156,7 @@ begin
   -- create — also persist description & proctoring_mode
   -- ----------------------------------------------------------------
   if operation = 'create' then
-    result := public.examroom_v5(operation, payload);
+    result := public.examroom_v7(operation, payload);
     update examroom.exams
        set description     = nullif(trim(coalesce(payload->>'description', '')), ''),
            proctoring_mode = case when payload->>'proctoring_mode' = 'snapshots' then 'snapshots' else 'off' end
@@ -466,7 +477,7 @@ begin
   -- Fall through to previous version for all other operations
   -- Also: inject attemptId / next_capture_at for start, resume, save, heartbeat
   -- ----------------------------------------------------------------
-  result := public.examroom_v5(operation, payload);
+  result := public.examroom_v7(operation, payload);
 
   if operation in ('start', 'resume', 'save', 'heartbeat') then
     select * into a
