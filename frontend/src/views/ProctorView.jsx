@@ -38,9 +38,10 @@ export default function ProctorView({ notify, profile }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      // Fetch independently so a monitor failure doesn't prevent captures from loading
       const [capturesResult, monitorResult] = await Promise.all([
         examRequest('proctor_captures', { examId: id }),
-        examRequest('monitor', { examId: id }),
+        examRequest('monitor', { examId: id }).catch(() => null),
       ])
       setData(capturesResult)
       setIncidentData(monitorResult)
@@ -306,34 +307,49 @@ export default function ProctorView({ notify, profile }) {
             </Panel>
           )}
 
-          {incidentData?.integrity?.map((entry, i) => (
-            <Panel key={i} className="p-5">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <p className="font-semibold text-sm">{entry.name || 'Unknown candidate'}</p>
-                  <p className="text-xs text-muted">{entry.email}</p>
+          {incidentData?.integrity?.map((entry, i) => {
+            // The monitor API returns disconnects as an array of objects and timings as an array.
+            // Derive counts from arrays so we never accidentally render an object as a React child.
+            const disconnectCount = Array.isArray(entry.disconnects)
+              ? entry.disconnects.length
+              : (typeof entry.disconnects === 'number' ? entry.disconnects : null)
+            const timingAnomalies = Array.isArray(entry.timings)
+              ? entry.timings.filter(t => t.indicator === true).length
+              : (typeof entry.timing_anomalies === 'number' ? entry.timing_anomalies : null)
+            const tabSwitches = typeof entry.tab_switches === 'number' ? entry.tab_switches : null
+            const pasteEvents = typeof entry.paste_events === 'number' ? entry.paste_events : null
+            const fullscreenExits = typeof entry.fullscreen_exits === 'number' ? entry.fullscreen_exits : null
+
+            return (
+              <Panel key={i} className="p-5">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <p className="font-semibold text-sm">{entry.name || 'Unknown candidate'}</p>
+                  </div>
                 </div>
-              </div>
-              <div className="text-xs text-muted space-y-1">
-                {entry.disconnects != null && (
-                  <p>Disconnects: <span className="text-ink font-medium">{entry.disconnects}</span></p>
-                )}
-                {entry.timing_anomalies != null && (
-                  <p>Timing anomalies: <span className="text-ink font-medium">{entry.timing_anomalies}</span></p>
-                )}
-                {entry.tab_switches != null && (
-                  <p>Tab / focus changes: <span className="text-ink font-medium">{entry.tab_switches}</span></p>
-                )}
-                {entry.paste_events != null && (
-                  <p>Paste events: <span className="text-ink font-medium">{entry.paste_events}</span></p>
-                )}
-                {entry.fullscreen_exits != null && (
-                  <p>Fullscreen exits: <span className="text-ink font-medium">{entry.fullscreen_exits}</span></p>
-                )}
-                {entry.notes && <p className="mt-1 text-muted">{entry.notes}</p>}
-              </div>
-            </Panel>
-          ))}
+                <div className="text-xs text-muted space-y-1">
+                  {disconnectCount != null && disconnectCount > 0 && (
+                    <p>Disconnects: <span className="text-ink font-medium">{disconnectCount}</span></p>
+                  )}
+                  {timingAnomalies != null && timingAnomalies > 0 && (
+                    <p>Timing anomalies: <span className="text-ink font-medium">{timingAnomalies}</span></p>
+                  )}
+                  {tabSwitches != null && tabSwitches > 0 && (
+                    <p>Tab / focus changes: <span className="text-ink font-medium">{tabSwitches}</span></p>
+                  )}
+                  {pasteEvents != null && pasteEvents > 0 && (
+                    <p>Paste events: <span className="text-ink font-medium">{pasteEvents}</span></p>
+                  )}
+                  {fullscreenExits != null && fullscreenExits > 0 && (
+                    <p>Fullscreen exits: <span className="text-ink font-medium">{fullscreenExits}</span></p>
+                  )}
+                  {!disconnectCount && !timingAnomalies && !tabSwitches && !pasteEvents && !fullscreenExits && (
+                    <p className="italic">No anomalies detected.</p>
+                  )}
+                </div>
+              </Panel>
+            )
+          })}
         </div>
       )}
     </div>
