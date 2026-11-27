@@ -1,6 +1,14 @@
 # UnCooked
 
-Phase 1 of the Web-e-Thon examination system. Examiners can create, enroll, and publish a scheduled single-answer MCQ exam. Candidates can complete it with server-enforced timing, autosave, review flags, refresh recovery, and a submission receipt. Administrators can view the platform’s examinations.
+UnCooked supports administrator account management, examiner question banks, scheduled mixed-format exams, candidate enrollment, timed attempts, announcements, incident review, grading, and controlled publication of private results.
+
+## Phase 2
+
+Administrators can create accounts, assign roles, disable access, and reset passwords. Examiners can create and edit reusable questions by topic and difficulty, then copy questions into draft exams. Single-answer, multiple-select, and written questions are supported. Multiple-select uses exact-match marking with zero marks for a partial or incorrect selection. Written responses are manually graded between zero and the assigned maximum.
+
+Use **Question bank and settings** on an exam to assign questions and enable stable question-order randomization. Published exam content is locked. Use **Monitor and grade** to refresh progress, review incidents, send announcements, grade submissions, and review aggregate scores. Result publication is blocked while active attempts or ungraded written responses remain. Candidates use **View result** to see their own published score.
+
+Run `node --env-file=.env scripts/phase-two-smoke.mjs` for the mixed-format API verification.
 
 ## Local setup
 

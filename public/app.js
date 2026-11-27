@@ -1,4 +1,5 @@
 import { examRequest, hasSession, signIn, signOut } from './api.js'
+import { phaseTwo, examTools } from './phase-two.js'
 import { authPanel, landing, landingNav } from './site.js'
 
 const main = document.querySelector('#main')
@@ -126,12 +127,13 @@ function pageHeader(title, description, action = '') {
 
 function statusOf(exam, now) {
   if (!exam.published) return 'Draft'
+  if (exam.submitted_at) return 'Completed'
   if (now < Date.parse(exam.opens_at)) return 'Upcoming'
   if (now >= Date.parse(exam.closes_at)) return 'Closed'
-  return 'Available'
+  return 'Ongoing'
 }
 
-function home() {
+async function home() {
   const { profile, exams, serverTime } = dashboard
   const now = Date.parse(serverTime)
   const examiner = profile.role === 'examiner'
@@ -143,7 +145,7 @@ function home() {
     administrator: 'View examination activity across the platform.',
   }
   show(`${pageHeader(title, descriptions[profile.role], examiner ? '<a class="button primary" href="#create">New examination</a>' : '')}
-    <section class="exam-list" aria-label="Examinations">
+    <div class="form-actions">${await phaseTwo('',null,{show,safe,notify,profile})}</div><section class="exam-list" aria-label="Examinations">
     ${exams.length ? exams.map(exam => {
       const status = statusOf(exam, now)
       // An existing attempt can still be opened after the exam closes.
@@ -155,7 +157,7 @@ function home() {
         ${candidate && exam.instructions ? '<p class="exam-instructions">' + safe(exam.instructions) + '</p>' : ''}
         <dl class="metadata"><div><dt>Opens</dt><dd>${date(exam.opens_at)}</dd></div>
         <div><dt>Closes</dt><dd>${date(exam.closes_at)}</dd></div>
-        <div><dt>Duration</dt><dd>${exam.duration} min</dd></div></dl></div>${action}
+        <div><dt>Duration</dt><dd>${exam.duration} min</dd></div></dl></div>${action}${candidate ? `<a class="button secondary" href="#result/${exam.id}">View result</a>` : ''}
       </article>`
     }).join('') : '<p class="panel empty">No examinations to show.</p>'}
     </section>`)
@@ -259,6 +261,7 @@ function manage(id, data) {
         ${candidate.submittedAt ? '<small>' + date(candidate.submittedAt) + '</small>' : ''}</div></li>`).join('') + '</ul>'
         : '<p class="muted">No candidates enrolled.</p>'}
     </section></div>`)
+  void examTools(id, {safe,notify})
   bindForm('#enroll', async data => {
     const fresh = await examRequest('enroll', { examId: id, email: data.get('email') })
     manage(id, fresh)
@@ -304,17 +307,20 @@ function take(id, data) {
       <button id="submit" class="primary" type="button">Submit attempt</button></div>
     </dialog>`)
   activeAttempt = state
+  document.querySelector('.attempt-sidebar').insertAdjacentHTML('beforeend', '<div id="announcements" aria-live="polite"></div>')
+  let nextPoll = 0
   const saveState = document.querySelector('#save-state')
   const retry = document.querySelector('#retry')
   const dialog = document.querySelector('#submit-dialog')
-  function answered() { return questions.filter(q => q.choice !== null).length }
+  function isAnswered(q) { return q.kind === 'written' ? Boolean(q.written.trim()) : q.kind === 'multiple' ? q.selected.length > 0 : q.choice !== null }
+  function answered() { return questions.filter(isAnswered).length }
   function refreshNavigator() {
     document.querySelector('#progress').textContent = answered() + ' of ' + questions.length + ' answered'
     const nav = document.querySelector('#navigator')
     nav.innerHTML = questions.map((q, i) => `<button type="button" data-index="${i}"
-      class="${q.choice !== null ? 'answered' : ''} ${q.flagged ? 'flagged' : ''}"
+      class="${isAnswered(q) ? 'answered' : ''} ${q.flagged ? 'flagged' : ''}"
       aria-current="${i === state.index ? 'step' : 'false'}"
-      aria-label="Question ${i + 1}, ${q.choice === null ? 'unanswered' : 'answered'}${q.flagged ? ', flagged' : ''}">${i + 1}</button>`).join('')
+      aria-label="Question ${i + 1}, ${isAnswered(q) ? 'answered' : 'unanswered'}${q.flagged ? ', flagged' : ''}">${i + 1}</button>`).join('')
   }
   function finalize(response) {
     if (!response.submittedAt) return false
@@ -322,7 +328,7 @@ function take(id, data) {
     return true
   }
   function enqueue(q) {
-    const snapshot = { examId: id, questionId: q.id, choice: q.choice, flagged: q.flagged }
+    const snapshot = { examId: id, questionId: q.id, choice: q.choice, flagged: q.flagged, selected: [...(q.selected || [])], written: q.written || '' }
     state.unsaved.set(q.id, snapshot)
     saveState.textContent = 'Saving changes…'
     retry.hidden = true
@@ -347,18 +353,22 @@ function take(id, data) {
     const section = document.querySelector('#question')
     section.innerHTML = `<div class="question-meta"><span>Question ${index + 1} of ${questions.length}</span><span>${q.marks} marks</span></div>
       <fieldset class="choices"><legend tabindex="-1">${safe(q.prompt)}</legend>
-      ${q.choices.map((choice, i) => `<label class="choice"><input type="radio" name="answer" value="${i}" ${q.choice === i ? 'checked' : ''}>
+      ${q.kind === 'written' ? `<label>Written answer<textarea id="written" maxlength="20000" rows="8">${safe(q.written)}</textarea></label>` : q.choices.map((choice, i) => `<label class="choice"><input type="${q.kind === 'multiple' ? 'checkbox' : 'radio'}" name="answer" value="${i}" ${(q.kind === 'multiple' ? q.selected.includes(i) : q.choice === i) ? 'checked' : ''}>
       <span class="letter">${'ABCD'[i]}</span><span>${safe(choice)}</span></label>`).join('')}</fieldset>
-      <div class="question-tools"><button type="button" class="link-button" id="clear-answer" ${q.choice === null ? 'disabled' : ''}>Clear answer</button>
+      <div class="question-tools"><button type="button" class="link-button" id="clear-answer" ${!isAnswered(q) ? 'disabled' : ''}>Clear answer</button>
       <label class="flag"><input type="checkbox" id="flag" ${q.flagged ? 'checked' : ''}> Mark for review</label></div>
       <div class="question-actions"><button type="button" class="secondary" id="previous" ${index === 0 ? 'disabled' : ''}>Previous question</button>
       <button type="button" class="secondary" id="next" ${index === questions.length - 1 ? 'disabled' : ''}>Next question</button></div>`
     const clear = section.querySelector('#clear-answer')
     section.querySelectorAll('[name=answer]').forEach(input => input.onchange = () => {
-      q.choice = Number(input.value); clear.disabled = false; refreshNavigator(); enqueue(q)
+      if (q.kind === 'multiple') q.selected = [...section.querySelectorAll('[name=answer]:checked')].map(el => Number(el.value))
+      else q.choice = Number(input.value)
+      clear.disabled = !isAnswered(q); refreshNavigator(); enqueue(q)
     })
+    const written = section.querySelector('#written')
+    if (written) written.oninput = () => { q.written = written.value; clear.disabled = !isAnswered(q); refreshNavigator(); enqueue(q) }
     clear.onclick = () => {
-      q.choice = null; enqueue(q); displayQuestion(index)
+      q.choice = null; q.selected = []; q.written = ''; enqueue(q); displayQuestion(index)
       section.querySelector('legend').focus()
     }
     section.querySelector('#flag').onchange = event => {
@@ -398,6 +408,12 @@ function take(id, data) {
   const clock = document.querySelector('#clock')
   let checkingExpiry = false
   async function tick() {
+    if (performance.now() > nextPoll) {
+      nextPoll = performance.now() + 10000
+      examRequest('announcements', {examId:id}).then(items => {
+        if (activeAttempt === state) document.querySelector('#announcements').innerHTML = items.map(item => '<p>' + safe(item.message) + '</p>').join('')
+      }).catch(() => {})
+    }
     const seconds = Math.max(0, Math.ceil((remaining - (performance.now() - synchronizedAt)) / 1000))
     clock.textContent = Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0')
     clock.classList.toggle('low', seconds < 60)
@@ -431,6 +447,7 @@ async function route() {
     document.body.dataset.view = 'workspace'
     brand.href = '/login'
     const { profile } = dashboard
+    if (['users','bank','monitor','result'].includes(view)) { await phaseTwo(view,id,{show,safe,notify,profile}); return }
     account.innerHTML = `<div class="account-label"><strong>${safe(profile.name)}</strong>
       <span>${roles[profile.role]}</span></div><button class="secondary" id="logout" type="button">Sign out</button>`
     document.querySelector('#logout').onclick = async () => {
@@ -448,13 +465,16 @@ async function route() {
   } catch (error) {
     if (version !== routeVersion) return
     if (!hasSession()) login()
-    else if (dashboard && view) { home(); notify(error.message, true) }
+    else if (dashboard && view) { await home(); notify(error.message, true) }
     else show(`<section class="panel empty"><h1>Could not open UnCooked</h1><p>${safe(error.message)}</p>
       <button class="primary" id="reload" type="button">Try again</button></section>`)
     document.querySelector('#reload')?.addEventListener('click', route)
   }
 }
 
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && activeAttempt) examRequest('incident', {examId:activeAttempt.id,event:'page_hidden'}).catch(() => {})
+})
 addEventListener('beforeunload', event => {
   if (activeAttempt?.unsaved.size) event.preventDefault()
 })
