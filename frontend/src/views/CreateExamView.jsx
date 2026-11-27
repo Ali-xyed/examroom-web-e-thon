@@ -83,12 +83,11 @@ export default function CreateExamView({ notify, profile }) {
       if (!qEls.length) throw new Error('Include at least one question.')
 
       const inlineQuestions = qEls.map(el => {
-        const qData = new FormData(el)
         return {
-          prompt: qData.get('prompt'),
-          choices: qData.getAll('choice'),
-          correct: Number(qData.get('correct') ?? 0),
-          marks: Number(qData.get('marks')),
+          prompt: el.querySelector('[name="prompt"]').value,
+          choices: [...el.querySelectorAll('[name="choice"]')].map(input => input.value),
+          correct: Number(el.querySelector('[name="correct"]')?.value ?? 0),
+          marks: Number(el.querySelector('[name="marks"]').value),
           kind: 'single',
         }
       })
@@ -121,13 +120,13 @@ export default function CreateExamView({ notify, profile }) {
       <Breadcrumb back="Back to Examinations" backHref="/workspace" current="New examination" />
       <PageHeader title="New examination" description="Add the schedule, instructions, and questions." />
 
-      <div className="grid md:grid-cols-[1.65fr_1fr] gap-4 items-start">
+      <div className="create-grid grid gap-4 items-start">
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
           <Panel>
             <h2>Exam details</h2>
             <label className="form-label">Title <input className="form-input" name="title" required maxLength={150} /></label>
             <label className="form-label">Candidate instructions <textarea className="form-textarea" name="instructions" maxLength={5000} rows={3} /></label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="schedule-fields grid gap-3">
               <label className="form-label">Opens at <input className="form-input" type="datetime-local" name="opensAt" required defaultValue={inputDate(new Date(now))} /></label>
               <label className="form-label">Closes at <input className="form-input" type="datetime-local" name="closesAt" required defaultValue={inputDate(new Date(now + 3600000))} /></label>
               <label className="form-label">Duration (min) <input className="form-input" name="duration" type="number" min={1} max={480} defaultValue={30} required /></label>
@@ -162,7 +161,7 @@ export default function CreateExamView({ notify, profile }) {
         </form>
 
         {/* Bank sidebar */}
-        <Panel>
+        <Panel className="bank-sidebar">
           <div className="flex justify-between items-center mb-3">
             <div>
               <h2>Question bank</h2>

@@ -46,13 +46,13 @@ export default function HomeView({ dashboard, onReload, notify }) {
         </div>
       )}
 
-      <section className="grid gap-3" aria-label="Examinations">
+      <section className="exam-list grid gap-3" aria-label="Examinations">
         {exams.length ? (
           exams.map(exam => {
             const status = statusOf(exam, now)
             const open = candidate && status !== 'Upcoming'
             return (
-              <article key={exam.id} className="panel flex items-center justify-between gap-4 px-6 py-5">
+              <article key={exam.id} className="exam-card panel flex items-center justify-between gap-4 px-6 py-5">
                 <div>
                   <Pill variant={statusPillVariant(status)}>{status}</Pill>
                   <h2 className="text-base font-semibold mt-2 mb-3 overflow-wrap-anywhere">{exam.title}</h2>
@@ -65,7 +65,7 @@ export default function HomeView({ dashboard, onReload, notify }) {
                     ['Duration', `${exam.duration} min`],
                   ]} />
                 </div>
-                <div className="flex flex-col gap-2 flex-none">
+                <div className="exam-card-actions flex gap-2 flex-none">
                   {examiner && (
                     <Link to={`/workspace/manage/${exam.id}`} className="btn-secondary">Manage exam</Link>
                   )}

@@ -24,9 +24,15 @@
   body {
     @apply m-0 font-sans text-ink antialiased;
     letter-spacing: -0.011em;
+    line-height: 1.55;
   }
 
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  [hidden] { display: none !important; }
+  input[type=radio], input[type=checkbox] { accent-color: var(--ink); }
+
   h1 {
+    font-weight: 700;
     font-size: clamp(1.65rem, 3vw, 2rem);
     letter-spacing: -0.045em;
     overflow-wrap: anywhere;
@@ -35,6 +41,7 @@
   }
 
   h2 {
+    font-weight: 700;
     font-size: 1.125rem;
     letter-spacing: -0.025em;
     line-height: 1.16;
@@ -42,6 +49,7 @@
   }
 
   h3 {
+    font-weight: 700;
     font-size: 1rem;
     line-height: 1.16;
     margin-bottom: 0.7rem;

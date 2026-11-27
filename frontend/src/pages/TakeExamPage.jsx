@@ -338,7 +338,7 @@ export default function TakeExamPage() {
   }
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="attempt-shell min-h-screen bg-white">
       {/* Top bar */}
       <header className="sticky top-0 z-10 bg-white/95 border-b border-line backdrop-blur-md">
         <div className="w-full max-w-[1160px] mx-auto px-6 min-h-[3.45rem] flex gap-4 justify-between items-center">
@@ -361,9 +361,9 @@ export default function TakeExamPage() {
         <h1 className="text-lg font-bold mb-1">{exam.title}</h1>
         <p className="text-muted text-sm mb-6">{exam.instructions || 'Answer the questions and submit before time expires.'}</p>
 
-        <div className={`grid gap-4 ${layout === 'side' ? 'md:grid-cols-[1.65fr_1fr]' : ''} items-start`}>
+        <div className={`attempt-grid grid gap-4 ${layout === 'side' ? '' : 'stacked'} items-start`}>
           {/* Question */}
-          <div className="panel p-6" id="question" style={{ fontSize: textSize + 'px' }} inert={seconds === 0 ? '' : undefined}>
+          <div className="attempt-question panel p-6" id="question" style={{ fontSize: textSize + 'px' }} inert={seconds === 0 ? '' : undefined}>
             {q && (
               <div>
                 <div className="flex justify-between items-center text-sm text-muted mb-4">
@@ -442,7 +442,7 @@ export default function TakeExamPage() {
           </div>
 
           {/* Sidebar */}
-          <aside className="panel p-5 space-y-4">
+          <aside className="attempt-sidebar panel p-5 space-y-4">
             <div>
               <h2 className="text-sm font-semibold mb-2">Question navigator</h2>
               <p className="text-xs text-muted mb-2">{answered.length} of {questions.length} answered</p>

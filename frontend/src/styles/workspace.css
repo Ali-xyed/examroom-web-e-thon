@@ -1,0 +1,86 @@
+/* Shared workspace rhythm from the original UI, expressed against React components. */
+.brand { display: flex; gap: .2rem; align-items: center; font-weight: 750; color: var(--ink); font-size: 1.1rem; letter-spacing: -.035em; text-decoration: none; }
+.logo { display: block; width: 3.6rem; height: 1.8rem; flex: none; object-fit: contain; }
+.btn-primary, .btn-secondary, .btn-link { min-height: 38px; line-height: 1.4; gap: .4rem; transition: background-color .16s, border-color .16s, box-shadow .16s; }
+.btn-primary:disabled, .btn-secondary:disabled { opacity: .48; }
+.btn-primary:not(:disabled):active, .btn-secondary:not(:disabled):active { transform: translateY(1px); }
+.panel { border-radius: 12px; box-shadow: 0 1px 3px #24232105, 0 4px 16px #24232104; min-width: 0; }
+.form-label { font-weight: 500; gap: .45rem; }
+.form-input, .form-textarea, .form-select { border-color: #deddd8; line-height: 1.5; transition: border-color .16s, box-shadow .16s; }
+.form-input:hover, .form-textarea:hover, .form-select:hover { border-color: #b9b7af; }
+.form-input:focus-visible, .form-textarea:focus-visible, .form-select:focus-visible { outline: none; border-color: #787774; box-shadow: 0 0 0 3px #37352f0d; }
+.form-textarea { min-height: 90px; }
+.workspace-header-inner, .workspace-bar-inner, .workspace-main { width: min(1080px, calc(100% - 3rem)); margin-inline: auto; }
+.workspace-header-inner { min-height: 64px; }
+.account-label { display: grid; line-height: 1.3; gap: .2rem; }
+.account-label > div:first-child { max-width: 17rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-main { padding: 2.5rem 0 4rem; }
+.workspace-bar { background: #fafaf9; border-bottom: 1px solid var(--line); }
+.workspace-bar-inner { min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: .35rem 0; }
+.workspace-nav { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
+.workspace-link { font-size: .85rem; font-weight: 550; color: var(--muted); text-decoration: none; padding: .32rem .7rem; border-radius: 6px; transition: background-color .15s, color .15s; }
+.workspace-link:hover { background: var(--soft); color: var(--ink); }
+.workspace-link.active { background: var(--ink); color: #fff; }
+.workspace-status { display: inline-flex; align-items: center; gap: .45rem; font-size: .8rem; color: var(--muted); font-weight: 500; }
+.conn-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.conn-dot.online { background: #336548; }
+.conn-dot.offline { background: #a62c32; }
+.page-heading { align-items: center; gap: 1.5rem; margin-bottom: 1.75rem; }
+.page-heading h1 { margin-bottom: .5rem; }
+.page-heading p { margin: 0; max-width: 46rem; line-height: 1.6; }
+.page-heading > :last-child { flex-wrap: wrap; }
+.page-heading > div:last-child > .flex { flex-wrap: wrap; }
+.create-grid { grid-template-columns: minmax(0, 1.45fr) minmax(300px, 1fr); gap: 1.25rem; }
+.schedule-fields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.bank-sidebar { position: sticky; top: 80px; max-height: calc(100svh - 104px); overflow-y: auto; }
+.breadcrumb { display: flex; align-items: center; gap: .5rem; font-size: .875rem; color: var(--muted); margin-bottom: 1.25rem; flex-wrap: wrap; }
+.breadcrumb a { margin: 0; text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+.exam-list { gap: 1rem; }
+.exam-card { padding: 1.5rem; align-items: center; gap: 2rem; }
+.exam-card > div:first-child { flex: 1; min-width: 0; }
+.exam-card h2 { line-height: 1.4; margin: .65rem 0 .75rem; font-size: 1.1rem; }
+.exam-card-actions { flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+.metadata-list { gap: .85rem 1.75rem; margin-bottom: 0; }
+.metadata-list dt { margin-bottom: .25rem; font-size: .8rem; }
+.metadata-list dd { line-height: 1.5; }
+.pill { padding: .2rem .55rem; border-radius: 5px; font-size: .75rem; }
+.pill-disabled { background: #fdebec; color: #a62c32; }
+.app-notice { max-width: min(28rem, calc(100% - 2rem)); }
+.attempt-shell { background: white; }
+.attempt-shell .attempt-sidebar { position: sticky; top: 84px; }
+.attempt-shell .attempt-grid { gap: 1.25rem; grid-template-columns: minmax(0, 1fr) 320px; }
+.attempt-shell .attempt-grid.stacked { grid-template-columns: 1fr; }
+.attempt-question label:has(input[type=radio]), .attempt-question label:has(input[type=checkbox]) { min-height: 3.1rem; padding: .85rem; line-height: 1.5; border-radius: 8px; }
+.attempt-question label:hover { border-color: var(--line-strong); }
+@media (max-width: 1000px) {
+  .create-grid { grid-template-columns: minmax(0, 1fr); }
+  .bank-sidebar { position: static; max-height: none; }
+  .exam-card-actions { flex-direction: column; align-items: stretch; }
+  .attempt-shell .attempt-grid { grid-template-columns: minmax(0, 1fr) 280px; }
+}
+@media (max-width: 720px) {
+  .workspace-header-inner, .workspace-bar-inner, .workspace-main { width: calc(100% - 1.5rem); }
+  .workspace-main { padding-top: 1.5rem; }
+  .workspace-bar-inner { gap: .5rem; }
+  .workspace-header-inner { gap: .5rem; }
+  .workspace-header .brand { font-size: 1rem; }
+  .workspace-header .logo { width: 2.8rem; }
+  .account-label > div:first-child { max-width: 110px; font-size: .8rem; }
+  .account-label > div:last-child { font-size: .75rem; }
+  .workspace-status { padding-inline: .7rem; }
+  .page-heading { align-items: flex-start; flex-wrap: wrap; margin-bottom: 1.25rem; gap: 1rem; }
+  .page-heading p { font-size: .9rem; }
+  .page-heading > div:last-child { max-width: 100%; }
+  .exam-card { flex-direction: column; align-items: flex-start; gap: 1.25rem; padding: 1.125rem; }
+  .exam-card-actions { flex-direction: row; justify-content: flex-start; width: 100%; }
+  .exam-card-actions > a { flex: 1; }
+  .metadata-list { gap: .75rem 1.25rem; }
+  .metadata-list dd { font-size: .85rem; }
+  .attempt-shell .attempt-grid { grid-template-columns: minmax(0, 1fr); }
+  .attempt-shell .attempt-sidebar { position: static; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+  .btn-primary, .btn-secondary, .btn-link, .form-input, .form-select, .form-textarea { transition: none; }
+}
