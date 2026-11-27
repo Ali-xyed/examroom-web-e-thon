@@ -9,7 +9,7 @@ export const landingNav = `<nav class="landing-nav" aria-label="Overview">
 </nav>`
 
 const steps = [
-  ['Sign in to Examroom', 'Use the account provided by your administrator to access your role’s workspace.'],
+  ['Sign in to UnCooked', 'Use the account provided by your administrator to access your role’s workspace.'],
   ['Create and publish an exam', 'The examiner sets the schedule, adds questions, and enrolls the candidates.'],
   ['Open your assigned exam', 'Candidates can start during the exam window, navigate questions, and flag items for review.'],
   ['Review and submit', 'Answers save as you work. Review your progress and submit before the deadline.'],
@@ -38,7 +38,7 @@ function landingDemo() {
     ${artwork('pile-1.webp', 'sticker sticker-face')}
     ${artwork('bulb-sticker.svg', 'sticker sticker-bulb')}
     <div class="product-browser">
-      <div class="product-bar" aria-hidden="true"><i></i><i></i><i></i><span>examroom.app/candidate</span></div>
+      <div class="product-bar" aria-hidden="true"><i></i><i></i><i></i><span>UnCooked / Candidate</span></div>
       <div class="product-body">
         <div class="product-tabs">
           <button class="primary" type="button" data-preview="exams" aria-pressed="true">My exams</button>
@@ -105,7 +105,7 @@ export function landing() {
     <div class="fairness-card"><h3>Built for fairness</h3><p>The server checks eligibility and enforces the deadline, so refreshing or changing the device clock cannot extend an attempt.</p></div>
   </div></section>
   <footer class="landing-footer"><div class="landing-container">
-    <a class="brand" href="/"><span class="logo" aria-hidden="true">E</span> Examroom</a>
+    <a class="brand" href="/"><img class="logo" src="/reference/uc-logo.png" alt=""> UnCooked</a>
     <span>Built for the Web-e-Thon Secure Examination Management System.</span>
     <a class="button" href="/login">Sign in <span aria-hidden="true">→</span></a>
   </div></footer>`

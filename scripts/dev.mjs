@@ -14,8 +14,8 @@ const files = new Map([
 ])
 createServer(async (request, response) => {
   const pathname = new URL(request.url, 'http://localhost').pathname
-  const artwork = /^\/reference\/[a-z0-9-]+\.(svg|webp)$/.exec(pathname)
-  const mime = { svg: 'image/svg+xml', webp: 'image/webp' }
+  const artwork = /^\/reference\/[a-z0-9-]+\.(png|svg|webp)$/.exec(pathname)
+  const mime = { png: 'image/png', svg: 'image/svg+xml', webp: 'image/webp' }
   const file = files.get(pathname) ?? (artwork && [pathname.slice(1), mime[artwork[1]]])
   if (!file) return response.writeHead(404).end()
   const data = await readFile('dist/' + file[0]).catch(() => null)
@@ -23,5 +23,5 @@ createServer(async (request, response) => {
   response.writeHead(200, { 'Content-Type': file[1] + '; charset=utf-8', 'Cache-Control': 'no-store' })
   response.end(data)
 }).listen(Number(process.env.PORT || 4173), '127.0.0.1', () => {
-  console.log('Examroom is running at http://127.0.0.1:' + (process.env.PORT || 4173))
+  console.log('UnCooked is running at http://127.0.0.1:' + (process.env.PORT || 4173))
 })

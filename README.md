@@ -1,4 +1,4 @@
-# Examroom
+# UnCooked
 
 Phase 1 of the Web-e-Thon examination system. Examiners can create, enroll, and publish a scheduled single-answer MCQ exam. Candidates can complete it with server-enforced timing, autosave, review flags, refresh recovery, and a submission receipt. Administrators can view the platform’s examinations.
 

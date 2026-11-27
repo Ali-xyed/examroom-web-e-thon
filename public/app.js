@@ -69,7 +69,7 @@ function login() {
       <div class="login">
         <a class="auth-back" href="/"><span aria-hidden="true">←</span> Back</a>
         <div class="login-content">
-          <div class="brand auth-brand"><span class="logo" aria-hidden="true">E</span> Examroom</div>
+          <div class="brand auth-brand"><img class="logo" src="/reference/uc-logo.png" alt=""> UnCooked</div>
           <h1>Welcome back</h1>
           <p class="muted">Use the credentials provided for your role.</p>
           <form id="login">
@@ -449,7 +449,7 @@ async function route() {
     if (version !== routeVersion) return
     if (!hasSession()) login()
     else if (dashboard && view) { home(); notify(error.message, true) }
-    else show(`<section class="panel empty"><h1>Could not open Examroom</h1><p>${safe(error.message)}</p>
+    else show(`<section class="panel empty"><h1>Could not open UnCooked</h1><p>${safe(error.message)}</p>
       <button class="primary" id="reload" type="button">Try again</button></section>`)
     document.querySelector('#reload')?.addEventListener('click', route)
   }

@@ -25,7 +25,9 @@ async function request(path, body, token) {
   if (response.status === 204) return null
   const data = await response.json()
   if (!response.ok) {
-    throw Object.assign(new Error(data.msg || data.message || 'The request failed.'), { status: response.status })
+    const message = data.msg || data.message || 'The request failed.'
+    const displayMessage = message === 'No Examroom role is assigned.' ? 'No role is assigned to this account.' : message
+    throw Object.assign(new Error(displayMessage), { status: response.status })
   }
   return data
 }
