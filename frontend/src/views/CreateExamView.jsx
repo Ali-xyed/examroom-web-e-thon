@@ -119,7 +119,7 @@ export default function CreateExamView({ notify }) {
     setAiLoading(true)
     try {
       const token = await sessionToken()
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/ai-exam`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/ai-exam`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

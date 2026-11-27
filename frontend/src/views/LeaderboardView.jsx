@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { examRequest, sessionToken } from '../api.js'
 import { Panel, Breadcrumb, PageHeader, Button } from '../components/ui.jsx'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 export default function LeaderboardView({ notify, profile }) {
   const { id } = useParams()

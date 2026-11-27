@@ -55,7 +55,7 @@ export default function TakeExamPage() {
   const [showConsent, setShowConsent] = useState(false)
   const [proctorReady, setProctorReady] = useState(false)
   const isProctored = useRef(false)
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+  const API_URL = import.meta.env.VITE_API_URL || ''
 
   // Initialize proctor hook
   const proctor = useProctor({

@@ -4,7 +4,7 @@ import { examRequest, sessionToken } from '../api.js'
 import { PageHeader, Panel, Button, Breadcrumb } from '../components/ui.jsx'
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 function priorityLabel(flagCount) {
   if (flagCount >= 2) return 'high'

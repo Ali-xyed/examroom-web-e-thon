@@ -5,21 +5,33 @@
   "buildCommand": "npm run build",
   "outputDirectory": "frontend/dist",
   "functions": {
-    "api/datesheet.js": { "maxDuration": 300 }
+    "api/datesheet.js":       { "maxDuration": 60 },
+    "api/proctor-upload.js":  { "maxDuration": 30 },
+    "api/proctor-image.js":   { "maxDuration": 10 },
+    "api/proctor-review.js":  { "maxDuration": 30 },
+    "api/proctor-cleanup.js": { "maxDuration": 300 },
+    "api/ai-grade.js":        { "maxDuration": 60 },
+    "api/ai-exam.js":         { "maxDuration": 60 },
+    "api/score-mail.js":      { "maxDuration": 60 }
   },
   "rewrites": [
-    { "source": "/login", "destination": "/index.html" },
-    { "source": "/verify", "destination": "/index.html" },
-    { "source": "/workspace/:path*", "destination": "/index.html" },
-    { "source": "/exam/:path*", "destination": "/index.html" }
+    { "source": "/api/proctor/upload",         "destination": "/api/proctor-upload" },
+    { "source": "/api/proctor/image",           "destination": "/api/proctor-image" },
+    { "source": "/api/proctor/image/:captureId","destination": "/api/proctor-image?captureId=:captureId" },
+    { "source": "/api/proctor/review",          "destination": "/api/proctor-review" },
+    { "source": "/api/proctor/cleanup",         "destination": "/api/proctor-cleanup" },
+    { "source": "/login",                       "destination": "/index.html" },
+    { "source": "/verify",                      "destination": "/index.html" },
+    { "source": "/workspace/:path*",            "destination": "/index.html" },
+    { "source": "/exam/:path*",                 "destination": "/index.html" }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
         { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "no-referrer" },
-        { "key": "X-Frame-Options", "value": "DENY" }
+        { "key": "Referrer-Policy",        "value": "no-referrer" },
+        { "key": "X-Frame-Options",        "value": "DENY" }
       ]
     }
   ]
