@@ -34,7 +34,20 @@ async function verifyJwt(req) {
   if (!match) return null
   const { data, error } = await supabase.auth.getUser(match[1])
   if (error || !data?.user) return null
-  return data.user
+  return { user: data.user, token: match[1] }
+}
+
+// Helper: call public.examroom_request as the authenticated user (always works on public schema)
+async function callExamroomRpc(userToken, operation, payload) {
+  const client = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_SERVICE_KEY,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { Authorization: `Bearer ${userToken}` } },
+    }
+  )
+  return client.rpc('examroom_request', { operation, payload })
 }
 
 // Helper: read raw JSON body when bodyParser is disabled (e.g. Vercel serverless)
@@ -59,8 +72,9 @@ export async function upload(req, res) {
 
   if (contentType.includes('application/json')) {
     try {
-      const user = await verifyJwt(req)
-      if (!user) return res.status(401).json({ error: 'Unauthorized.' })
+      const auth = await verifyJwt(req)
+      if (!auth) return res.status(401).json({ error: 'Unauthorized.' })
+      const { user, token } = auth
 
       const body = await readJsonBody(req)
       const { captureId, attemptId, examId, flags = [], missed } = body
@@ -71,15 +85,8 @@ export async function upload(req, res) {
       if (![captureId, attemptId, examId].every(v => uuidRe.test(v)))
         return res.status(400).json({ error: 'Invalid UUID format.' })
 
-      const { data: attempt, error: attemptErr } = await supabase
-        .from('attempts')
-        .select('id, candidate_id, exam_id, submitted_at, deadline')
-        .eq('id', attemptId)
-        .eq('candidate_id', user.id)
-        .is('submitted_at', null)
-        .single()
-
-      if (attemptErr || !attempt)
+      const { data: resumeData, error: resumeErr } = await callExamroomRpc(token, 'resume', { examId })
+      if (resumeErr || !resumeData || resumeData.submittedAt || resumeData.attemptId !== attemptId)
         return res.status(403).json({ error: 'Active attempt not found or access denied.' })
 
       const { error: dbErr } = await supabase
@@ -116,11 +123,12 @@ export async function upload(req, res) {
         }
 
         // 1. Auth
-        const user = await verifyJwt(req)
-        if (!user) {
+        const auth = await verifyJwt(req)
+        if (!auth) {
           res.status(401).json({ error: 'Unauthorized.' })
           return resolve()
         }
+        const { user, token } = auth
 
         // 2. Validate required fields
         const { captureId, attemptId, examId, flags: flagsRaw } = req.body
@@ -155,36 +163,15 @@ export async function upload(req, res) {
           return resolve()
         }
 
-        // 4. Verify attempt belongs to caller, is active (allow a 60s grace window for
-        //    captures taken near deadline to avoid spurious 403s due to clock skew)
-        const graceWindow = new Date(Date.now() - 60000).toISOString()
-        const { data: attempt, error: attemptErr } = await supabase
-          .from('attempts')
-          .select('id, candidate_id, exam_id, submitted_at, deadline')
-          .eq('id', attemptId)
-          .eq('candidate_id', user.id)
-          .is('submitted_at', null)
-          .gt('deadline', graceWindow)
-          .single()
-
-        if (attemptErr || !attempt) {
+        // 4 & 5. Verify active attempt and proctoring mode via public.examroom_request RPC
+        //        (works without requiring examroom schema to be exposed in PostgREST)
+        const { data: resumeData, error: resumeErr } = await callExamroomRpc(token, 'resume', { examId })
+        if (resumeErr || !resumeData || resumeData.submittedAt || resumeData.attemptId !== attemptId) {
           res.status(403).json({ error: 'Active attempt not found or access denied.' })
           return resolve()
         }
 
-        // 5. Confirm exam proctoring mode
-        const { data: exam, error: examErr } = await supabase
-          .from('exams')
-          .select('id, proctoring_mode')
-          .eq('id', examId)
-          .single()
-
-        if (examErr || !exam) {
-          res.status(403).json({ error: 'Exam not found.' })
-          return resolve()
-        }
-
-        if (exam.proctoring_mode !== 'snapshots') {
+        if (resumeData.proctoring_mode !== 'snapshots') {
           res.status(403).json({ error: 'Proctoring is not enabled for this exam.' })
           return resolve()
         }
@@ -241,8 +228,9 @@ export async function upload(req, res) {
 // Examiner retrieves a 60-second signed URL for a capture
 export async function getSignedUrl(req, res) {
   try {
-    const user = await verifyJwt(req)
-    if (!user) return res.status(401).json({ error: 'Unauthorized.' })
+    const auth = await verifyJwt(req)
+    if (!auth) return res.status(401).json({ error: 'Unauthorized.' })
+    const { user } = auth
 
     const captureId = req.params?.captureId || req.query?.captureId
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -298,8 +286,9 @@ export async function getSignedUrl(req, res) {
 // Body: { captureId, note, action } where action is 'reviewed' | 'escalated'
 export async function review(req, res) {
   try {
-    const user = await verifyJwt(req)
-    if (!user) return res.status(401).json({ error: 'Unauthorized.' })
+    const auth = await verifyJwt(req)
+    if (!auth) return res.status(401).json({ error: 'Unauthorized.' })
+    const { user } = auth
 
     const { captureId, note, action } = req.body
     if (!captureId || !action)
@@ -429,8 +418,9 @@ export async function review(req, res) {
 // POST /api/proctor/cleanup
 export async function cleanup(req, res) {
   try {
-    const user = await verifyJwt(req)
-    if (!user) return res.status(401).json({ error: 'Unauthorized.' })
+    const auth = await verifyJwt(req)
+    if (!auth) return res.status(401).json({ error: 'Unauthorized.' })
+    const { user } = auth
 
     const { data: prof } = await supabase
       .from('profiles')
