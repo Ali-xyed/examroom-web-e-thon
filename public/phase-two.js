@@ -60,23 +60,50 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
     function editor(q = {}) {
       document.querySelector('#bank-editor').innerHTML = `<form class="panel form-panel"><h2>${q.id ? 'Edit question' : 'New question'}</h2>
         <label>Question<textarea name="prompt" required maxlength="2000">${safe(q.prompt)}</textarea></label>
-        <div class="fields"><label>Type<select name="kind">${['single','multiple','written'].map(kind => `<option ${q.kind===kind?'selected':''}>${kind}</option>`).join('')}</select></label>
+        <div class="fields"><label>Type<select name="kind">${[['single','Single-answer MCQ'],['multiple','Multiple-select MCQ'],['written','Written response']].map(([kind,label]) => `<option value="${kind}" ${q.kind===kind?'selected':''}>${label}</option>`).join('')}</select></label>
         <label>Topic<input name="topic" required maxlength="100" value="${safe(q.topic || 'General')}"></label>
         <label>Difficulty<select name="difficulty">${['easy','medium','hard'].map(d => `<option ${q.difficulty===d?'selected':''}>${d}</option>`).join('')}</select></label>
         <label>Marks<input name="marks" type="number" min="1" max="100" value="${q.marks || 1}" required></label></div>
-        <p class="muted">For written questions, choice fields are ignored. Multiple-select questions use exact-match marking. All correct choices are required for full marks.</p>
-        <div class="fields">${['A','B','C','D'].map((letter,i) => `<label>Choice ${letter}<input name="choice" maxlength="500" value="${safe(q.choices?.[i] || '')}"></label>`).join('')}</div>
-        <label>Single-answer correct choice<select name="correct">${['A','B','C','D'].map((letter,i) => `<option value="${i}" ${q.correct===i?'selected':''}>${letter}</option>`).join('')}</select></label>
-        <fieldset><legend>Multiple-select correct choices</legend>${['A','B','C','D'].map((letter,i) => `<label class="flag"><input type="checkbox" name="correctSet" value="${i}" ${q.correct_set?.includes(i)?'checked':''}>${letter}</label>`).join('')}</fieldset>
+        <p class="muted" id="marking-help"></p>
+        <fieldset data-question-types="single multiple"><legend>Answer choices</legend><div class="fields">${['A','B','C','D'].map((letter,i) => `<label>Choice ${letter}<input name="choice" maxlength="500" value="${safe(q.kind === 'written' ? '' : q.choices?.[i] || '')}"></label>`).join('')}</div></fieldset>
+        <label data-question-types="single">Correct answer<select name="correct">${['A','B','C','D'].map((letter,i) => `<option value="${i}" ${q.correct===i?'selected':''}>${letter}</option>`).join('')}</select></label>
+        <fieldset data-question-types="multiple"><legend>Correct answers</legend>${['A','B','C','D'].map((letter,i) => `<label class="flag"><input type="checkbox" name="correctSet" value="${i}" ${q.correct_set?.includes(i)?'checked':''}>${letter}</label>`).join('')}</fieldset>
         <button class="primary">Save question</button> <button class="secondary" type="button" id="new-bank">New question</button></form>`
       document.querySelector('#new-bank').onclick = () => editor()
+      const form = document.querySelector('#bank-editor form')
+      const type = form.elements.kind
+      const correctChoices = [...form.querySelectorAll('[name="correctSet"]')]
+      function validateCorrectChoices() {
+        const missing = type.value === 'multiple' && !correctChoices.some(input => input.checked)
+        correctChoices[0].setCustomValidity(missing ? 'Select at least one correct answer.' : '')
+      }
+      function updateQuestionType() {
+        for (const group of form.querySelectorAll('[data-question-types]')) {
+          const visible = group.dataset.questionTypes.split(' ').includes(type.value)
+          group.hidden = !visible
+          for (const input of group.querySelectorAll('input, select')) {
+            input.disabled = !visible
+            input.required = visible && input.name === 'choice'
+          }
+        }
+        document.querySelector('#marking-help').textContent = {
+          single: 'Enter four choices and select one correct answer.',
+          multiple: 'Enter four choices and select the correct answers. Candidates must select exactly those answers for full marks.',
+          written: 'Candidates enter a written response. The examiner grades it up to the assigned marks.',
+        }[type.value]
+        validateCorrectChoices()
+      }
+      type.onchange = updateQuestionType
+      correctChoices.forEach(input => input.onchange = validateCorrectChoices)
+      updateQuestionType()
       document.querySelector('#bank-editor form').onsubmit = async event => {
         event.preventDefault()
         const data = new FormData(event.currentTarget)
         const payload = Object.fromEntries(data)
         payload.id=q.id
-        payload.choices=data.getAll('choice').map((choice,i) => payload.kind==='written' ? 'Unused '+i : choice)
-        payload.correctSet=data.getAll('correctSet').map(Number)
+        payload.choices = payload.kind === 'written' ? ['Unused 0','Unused 1','Unused 2','Unused 3'] : data.getAll('choice')
+        payload.correct = payload.kind === 'single' ? Number(data.get('correct')) : 0
+        payload.correctSet = payload.kind === 'multiple' ? data.getAll('correctSet').map(Number) : []
         await action('bank_save',payload,()=>phaseTwo(view,id,{show,safe,notify,profile}))
       }
     }
