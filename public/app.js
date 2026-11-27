@@ -1,8 +1,10 @@
 import { examRequest, hasSession, signIn, signOut } from './api.js'
+import { authPanel, landing, landingNav } from './site.js'
 
 const main = document.querySelector('#main')
 const account = document.querySelector('#account')
 const notice = document.querySelector('#notice')
+const brand = document.querySelector('.top .brand')
 const roles = { administrator: 'Administrator', examiner: 'Examiner', candidate: 'Candidate' }
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 let dashboard
@@ -60,35 +62,62 @@ function bindForm(selector, handler) {
 }
 
 function login() {
+  document.body.dataset.view = 'login'
   account.replaceChildren()
   show(`
     <section class="entry">
       <div class="login">
+        <a class="auth-back" href="/"><span aria-hidden="true">←</span> Back</a>
         <div class="login-content">
-          <h1>Sign in</h1>
+          <div class="brand auth-brand"><span class="logo" aria-hidden="true">E</span> Examroom</div>
+          <h1>Welcome back</h1>
           <p class="muted">Use the credentials provided for your role.</p>
           <form id="login">
-            <label>Email address<input type="email" name="email" autocomplete="username" required></label>
-            <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+            <label>Email address<input type="email" name="email" placeholder="you@institution.edu" autocomplete="username" required></label>
+            <div class="password-wrap">
+              <label>Password<input id="password" type="password" name="password" placeholder="••••••••" autocomplete="current-password" required></label>
+              <button type="button" id="password-toggle" aria-label="Show password" aria-controls="password"><span aria-hidden="true"></span></button>
+            </div>
+            <details class="auth-help"><summary>Forgot password?</summary><p>Contact your exam administrator to reset your credentials.</p></details>
             <p class="form-error" data-error role="alert"></p>
-            <button class="primary full" type="submit">Sign in</button>
+            <button class="primary full" type="submit"><span aria-hidden="true">⇥</span> Sign in</button>
           </form>
         </div>
       </div>
-      <aside class="intro" aria-labelledby="entry-title">
-        <div class="intro-content">
-          <div class="illustration" aria-hidden="true">
-            <div class="paper paper-back"></div>
-            <div class="paper paper-front"><div class="paper-title"></div><i></i><i></i><i></i><div class="paper-mark">✓</div></div>
-          </div>
-          <h2 id="entry-title">Manage and take<br>online examinations.</h2>
-        </div>
-      </aside>
+      ${authPanel}
     </section>`)
+  const password = document.querySelector('#password')
+  const toggle = document.querySelector('#password-toggle')
+  toggle.onclick = () => {
+    const visible = password.type === 'password'
+    password.type = visible ? 'text' : 'password'
+    toggle.setAttribute('aria-label', visible ? 'Hide password' : 'Show password')
+    toggle.classList.toggle('revealed', visible)
+  }
   bindForm('#login', async data => {
     await signIn(data.get('email').trim(), data.get('password'))
     await route()
   })
+}
+
+function showLanding() {
+  document.body.dataset.view = 'landing'
+  brand.insertAdjacentHTML('afterend', landingNav)
+  account.innerHTML = hasSession()
+    ? '<a class="button primary" href="/login">Open workspace</a>'
+    : '<a class="button primary" href="/login">Log in</a>'
+  show(landing())
+  const tabs = [...main.querySelectorAll('[data-preview]')]
+  const panels = [...main.querySelectorAll('[data-preview-panel]')]
+  tabs.forEach(button => button.onclick = () => {
+    for (const tab of tabs) {
+      tab.classList.toggle('primary', tab === button)
+      tab.setAttribute('aria-pressed', String(tab === button))
+    }
+    for (const panel of panels) panel.hidden = panel.dataset.previewPanel !== button.dataset.preview
+  })
+  const anchor = location.hash.slice(1)
+  if (['how', 'demo', 'features'].includes(anchor)) document.getElementById(anchor).scrollIntoView()
 }
 
 function pageHeader(title, description, action = '') {
@@ -399,6 +428,8 @@ async function route() {
     const info = await examRequest('dashboard')
     if (version !== routeVersion) return
     dashboard = info
+    document.body.dataset.view = 'workspace'
+    brand.href = '/login'
     const { profile } = dashboard
     account.innerHTML = `<div class="account-label"><strong>${safe(profile.name)}</strong>
       <span>${roles[profile.role]}</span></div><button class="secondary" id="logout" type="button">Sign out</button>`
@@ -424,8 +455,13 @@ async function route() {
   }
 }
 
-addEventListener('hashchange', route)
 addEventListener('beforeunload', event => {
   if (activeAttempt?.unsaved.size) event.preventDefault()
 })
-void route()
+if (location.pathname === '/' && !/^#(?:create$|manage\/|take\/)/.test(location.hash)) {
+  showLanding()
+} else {
+  if (location.pathname === '/') history.replaceState(null, '', '/login' + location.hash)
+  addEventListener('hashchange', route)
+  void route()
+}
