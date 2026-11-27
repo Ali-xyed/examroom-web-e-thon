@@ -144,6 +144,45 @@ function renderMarkdown(text) {
       continue
     }
 
+    // Markdown table
+    if (trimmed.includes('|') && i + 1 < lines.length && /^\|?[\s:-]+\|[\s|:-]*$/.test(lines[i + 1].trim())) {
+      const splitRow = (row) => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim())
+      const headers = splitRow(trimmed)
+      i += 2 // skip header + separator
+      const rows = []
+      while (i < lines.length && lines[i].trim().includes('|') && lines[i].trim() !== '') {
+        rows.push(splitRow(lines[i]))
+        i++
+      }
+      elements.push(
+        <div key={`tbl-${i}`} className="my-2.5 overflow-x-auto rounded-lg border border-line bg-white">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-surface border-b border-line">
+                {headers.map((h, idx) => (
+                  <th key={idx} className="text-left font-semibold px-3 py-2 border-r last:border-r-0 border-line">
+                    {parseInline(h)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, rIdx) => (
+                <tr key={rIdx} className="border-b last:border-b-0 border-line">
+                  {headers.map((_, cIdx) => (
+                    <td key={cIdx} className="px-3 py-2 border-r last:border-r-0 border-line align-top">
+                      {parseInline(r[cIdx] ?? '')}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+      continue
+    }
+
     // Empty line
     if (!trimmed) {
       i++

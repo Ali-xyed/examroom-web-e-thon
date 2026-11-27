@@ -12,8 +12,6 @@ alter table examroom.exams
 
 alter table examroom.audit_log alter column exam_id drop not null;
 alter table examroom.audit_log drop constraint if exists audit_log_exam_id_fkey;
-alter table examroom.audit_log add constraint audit_log_exam_id_fkey
-  foreign key (exam_id) references examroom.exams(id) on delete set null;
 
 -- ============================================================
 -- 2. Create proctor_captures table

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Button, Panel } from './ui.jsx'
 
 export default function ProctorConsent({ onConsented, onDenied }) {
@@ -11,6 +11,19 @@ export default function ProctorConsent({ onConsented, onDenied }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
 
+  useEffect(() => {
+    if (cameraStatus === 'ok' && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+      videoRef.current.play().catch(() => {})
+    }
+  }, [cameraStatus])
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop())
+    }
+  }, [])
+
   async function startCameraCheck() {
     setCameraStatus('checking')
     try {
@@ -19,7 +32,6 @@ export default function ProctorConsent({ onConsented, onDenied }) {
         audio: false,
       })
       streamRef.current = stream
-      if (videoRef.current) videoRef.current.srcObject = stream
       setCameraStatus('ok')
     } catch {
       setCameraStatus('denied')
