@@ -59,6 +59,36 @@ label { font-weight: 500; gap: .45rem; }
 .record-role { font-size: .8rem; text-transform: capitalize; color: var(--muted); }
 .record-row button { flex-shrink: 0; }
 .empty-list { color: var(--muted); padding: 1rem 0; }
+.users-panel { overflow: hidden; }
+.users-filters { display: grid; grid-template-columns: minmax(220px,1fr) 180px 160px; gap: 1rem; padding: 1.25rem 1.5rem; background: #fafaf9; border-bottom: 1px solid var(--line); }
+.users-filters label { margin: 0; font-size: .8rem; }
+.users-filters input, .users-filters select { font-size: .875rem; }
+.users-count { padding: 1rem 1.5rem 0; margin: 0; font-size: .8rem; color: var(--muted); }
+#users-list { padding: .5rem 1.5rem; }
+.user-row:first-child { border-top: none; }
+.user-avatar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); font-size: .875rem; flex: none; }
+.user-row .record-meta { min-width: 180px; justify-content: space-between; }
+.users-pagination { padding: 1rem 1.5rem; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.users-pagination > span { font-size: .8rem; color: var(--muted); }
+.users-pagination > div { display: flex; gap: .5rem; }
+.users-empty { padding: 2.5rem 1rem; text-align: center; }
+.users-empty p { color: var(--muted); font-size: .9rem; margin-bottom: 0; }
+.account-dialog { padding: 0; width: min(540px, calc(100% - 2rem)); max-height: calc(100svh - 2rem); overflow-y: auto; box-shadow: 0 24px 80px #0003; }
+.account-dialog::backdrop { background: #24232175; backdrop-filter: blur(3px); }
+.account-dialog-heading { padding: 1.5rem; display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; border-bottom: 1px solid var(--line); }
+.account-dialog-heading h2 { font-size: 1.25rem; margin: 0 0 .4rem; }
+.account-dialog-heading p { color: var(--muted); margin: 0; font-size: .875rem; overflow-wrap: anywhere; }
+.account-close { min-width: 32px; min-height: 32px; padding: .1rem; font-size: 1.4rem; line-height: 1; flex: none; background: transparent; }
+.account-fields { padding: 1.5rem 1.5rem .5rem; }
+.account-fields label { font-size: .875rem; }
+.account-fields .password-wrap input { padding-right: 42px; }
+.account-hint { font-size: .8rem; color: var(--muted); margin: -.25rem 0 1.25rem; }
+.account-fields .account-access { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.account-access strong, .account-access small { display: block; }
+.account-access strong { font-size: .875rem; font-weight: 600; }
+.account-access small { color: var(--muted); margin-top: .3rem; font-size: .8rem; line-height: 1.5; }
+.account-footer { padding: 1rem 1.5rem; background: #fafaf9; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: .6rem; position: sticky; bottom: 0; }
+#account-error:not(:empty) { margin: 0 1.5rem 1rem; padding: .75rem; background: #fdebec; border-radius: 6px; font-size: .875rem; }
 #editor form, #bank-editor form { margin-bottom: 1.25rem; }
 #editor form { max-width: 680px; }
 #editor .password-wrap input { padding-right: 42px; }
@@ -126,6 +156,17 @@ input[type=file]::file-selector-button { margin-right: .75rem; border: 1px solid
   .exam-card-actions { flex-direction: column; align-items: stretch; }
 }
 @media (max-width: 720px) {
+  .users-filters { grid-template-columns: 1fr 1fr; padding: 1rem; gap: .75rem; }
+  .users-filters label:first-child { grid-column: 1 / -1; }
+  #users-list { padding-inline: 1rem; }
+  .users-count { padding-inline: 1rem; }
+  .users-pagination { padding: 1rem; flex-wrap: wrap; }
+  .user-row .record-copy { flex-basis: calc(100% - 60px); }
+  .user-row .record-meta { order: initial; min-width: 0; flex: 1; justify-content: flex-start; }
+  .user-row button { font-size: .8rem; }
+  .account-dialog { width: calc(100% - 1rem); max-height: calc(100svh - 1rem); }
+  .account-dialog-heading, .account-fields { padding: 1.125rem; }
+  .account-footer { padding: 1rem 1.125rem; }
   [data-view="workspace"] main { padding-top: 1.5rem; }
   [data-view="workspace"] .top-inner { width: calc(100% - 1.5rem); }
   .account-label strong { max-width: 110px; font-size: .8rem; }

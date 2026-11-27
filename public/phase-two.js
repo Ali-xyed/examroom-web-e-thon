@@ -1,3 +1,4 @@
+import { manageUsers } from './users.js'
 import { examRequest } from './api.js'
 import { downloadReport } from './phase-three.js'
 
@@ -11,41 +12,7 @@ export async function phaseTwo(view, id, { show, safe, notify, profile }) {
     catch (error) { notify(error.message, true) }
   }
   if (view === 'users') {
-    const users = await examRequest('admin_list')
-    show(back + '<h1>User management</h1><div id="editor"></div><div class="panel form-panel">' +
-      '<h2>Accounts</h2>' + users.map(user => `<article class="record-row"><div class="record-copy"><strong>${safe(user.name)}</strong><span class="record-description">${safe(user.email)}</span></div><div class="record-meta"><span class="record-role">${safe(user.role)}</span><span class="pill ${user.active ? 'available' : 'disabled'}">${user.active ? 'Active' : 'Disabled'}</span></div>
-      <button class="secondary" data-user="${user.id}">Edit account</button></article>`).join('') + '</div>')
-    function editor(user = {}) {
-      document.querySelector('#editor').innerHTML = `<form class="panel form-panel">
-      <h2>${user.id ? 'Edit account' : 'Create account'}</h2>
-      <label>Name<input name="name" required maxlength="100" value="${safe(user.name)}"></label>
-      ${user.id ? '' : '<label>Email<input name="email" type="email" required></label>'}
-      <label>Role<select name="role">${['candidate','examiner','administrator'].map(role => `<option ${user.role === role ? 'selected' : ''}>${role}</option>`).join('')}</select></label>
-      <div class="password-wrap">
-        <label>${user.id ? 'New password (optional)' : 'Password'}<input id="password" name="password" type="password" minlength="12" ${user.id ? '' : 'required'} autocomplete="new-password"></label>
-        <button type="button" id="password-toggle" aria-label="Show password" aria-controls="password" aria-pressed="false"><span aria-hidden="true"></span></button>
-      </div>
-      <label class="flag"><input name="active" type="checkbox" ${user.active !== false ? 'checked' : ''}> Active account</label>
-      <button class="primary">Save account</button></form>`
-      const password = document.querySelector('#editor [name="password"]')
-      const toggle = document.querySelector('#editor #password-toggle')
-      toggle.onclick = () => {
-        const visible = password.type === 'password'
-        password.type = visible ? 'text' : 'password'
-        toggle.setAttribute('aria-label', visible ? 'Hide password' : 'Show password')
-        toggle.setAttribute('aria-pressed', String(visible))
-        toggle.classList.toggle('revealed', visible)
-      }
-      document.querySelector('#editor form').onsubmit = async event => {
-        event.preventDefault()
-        const data = Object.fromEntries(new FormData(event.currentTarget))
-        data.id = user.id
-        data.active = Boolean(data.active)
-        await action('admin_save', data, () => phaseTwo(view, id, {show,safe,notify,profile}))
-      }
-    }
-    editor()
-    document.querySelectorAll('[data-user]').forEach(button => button.onclick = () => editor(users.find(u => u.id === button.dataset.user)))
+    await manageUsers({show,safe,notify})
     return true
   }
   if (view === 'bank') {

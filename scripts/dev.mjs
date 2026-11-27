@@ -16,6 +16,7 @@ const files = new Map([
   ['/report-pdf.js', ['report-pdf.js', 'text/javascript']],
   ['/vendor/jspdf.umd.min.js', ['vendor/jspdf.umd.min.js', 'text/javascript']],
   ['/fonts/DejaVuSans.ttf', ['fonts/DejaVuSans.ttf', 'font/ttf']],
+  ['/users.js', ['users.js', 'text/javascript']],
   ['/phase-two.js', ['phase-two.js', 'text/javascript']],
   ['/site.js', ['site.js', 'text/javascript']],
   ['/api.js', ['api.js', 'text/javascript']],
