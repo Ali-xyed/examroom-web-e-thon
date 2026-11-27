@@ -1,0 +1,26 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci --prefix frontend && npm ci --prefix backend",
+  "buildCommand": "npm run build",
+  "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/datesheet.js": { "maxDuration": 300 }
+  },
+  "rewrites": [
+    { "source": "/login", "destination": "/index.html" },
+    { "source": "/verify", "destination": "/index.html" },
+    { "source": "/workspace/:path*", "destination": "/index.html" },
+    { "source": "/exam/:path*", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "no-referrer" },
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    }
+  ]
+}
