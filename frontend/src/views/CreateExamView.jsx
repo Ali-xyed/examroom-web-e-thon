@@ -1,71 +1,107 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { examRequest } from '../api.js'
 import { PageHeader, Panel, Button, FormError, Breadcrumb } from '../components/ui.jsx'
 
 const LETTERS = ['A', 'B', 'C', 'D']
 
-function QuestionFormFields({ q = {}, onChange }) {
-  const kind = q.kind || 'single'
-
-  return (
-    <div className="space-y-3">
-      <label className="form-label">
-        Question text
-        <textarea className="form-textarea" name="prompt" required maxLength={2000} rows={2}
-          defaultValue={q.prompt || ''} onChange={onChange} />
-      </label>
-      {kind !== 'written' && (
-        <fieldset className="border border-line rounded-md p-3">
-          <legend className="font-semibold text-sm px-1">Answer choices</legend>
-          <div className="grid grid-cols-2 gap-2">
-            {LETTERS.map((letter, i) => (
-              <label key={letter} className="form-label mb-0 text-sm">
-                Choice {letter}
-                <input className="form-input" name="choice" required maxLength={500} defaultValue={q.choices?.[i] || ''} />
-              </label>
-            ))}
-          </div>
-          <label className="form-label mt-2 text-sm">
-            Correct choice
-            <select className="form-select" name="correct" defaultValue={q.correct ?? 0}>
-              {LETTERS.map((letter, i) => <option key={i} value={i}>{letter}</option>)}
-            </select>
-          </label>
-        </fieldset>
-      )}
-      <label className="form-label text-sm">
-        Marks
-        <input className="form-input" name="marks" type="number" required min={1} max={100} defaultValue={q.marks || 1} />
-      </label>
-    </div>
-  )
+function makeBlankQuestion() {
+  return {
+    _key: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    bankId: null,
+    kind: 'single',
+    prompt: '',
+    choices: ['', '', '', ''],
+    correct: 0,
+    marks: 1,
+  }
 }
 
-export default function CreateExamView({ notify, profile }) {
+function inputDate(value) {
+  const local = new Date(value.getTime() - value.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 16)
+}
+
+export default function CreateExamView({ notify }) {
   const navigate = useNavigate()
   const [bank, setBank] = useState([])
   const [bankFilter, setBankFilter] = useState('')
-  const [questions, setQuestions] = useState([{ _key: Date.now(), kind: 'single' }])
+  const [title, setTitle] = useState('')
+  const [instructions, setInstructions] = useState('')
+  const [opensAt, setOpensAt] = useState(() => inputDate(new Date()))
+  const [closesAt, setClosesAt] = useState(() => inputDate(new Date(Date.now() + 3600000)))
+  const [duration, setDuration] = useState(30)
+  const [questions, setQuestions] = useState(() => [makeBlankQuestion()])
+  const [dropActive, setDropActive] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const formRef = useRef(null)
 
   useEffect(() => {
     examRequest('bank').then(setBank).catch(() => setBank([]))
   }, [])
 
-  function addQuestion() {
-    setQuestions(prev => [...prev, { _key: Date.now(), kind: 'single' }])
+  const addedBankIds = new Set(questions.map(q => q.bankId).filter(Boolean))
+
+  function addBlankQuestion() {
+    if (questions.length >= 50) return
+    setQuestions(prev => [...prev, makeBlankQuestion()])
   }
 
   function removeQuestion(key) {
-    setQuestions(prev => prev.filter(q => q._key !== key))
+    setQuestions(prev => (prev.length <= 1 ? prev : prev.filter(q => q._key !== key)))
   }
 
-  function inputDate(value) {
-    const local = new Date(value.getTime() - value.getTimezoneOffset() * 60000)
-    return local.toISOString().slice(0, 16)
+  function updateQuestion(key, patch) {
+    setQuestions(prev => prev.map(q => (q._key === key ? { ...q, ...patch } : q)))
+  }
+
+  function updateChoice(key, idx, val) {
+    setQuestions(prev =>
+      prev.map(q => {
+        if (q._key !== key) return q
+        const next = [...q.choices]
+        next[idx] = val
+        return { ...q, choices: next }
+      })
+    )
+  }
+
+  function addFromBank(bankItem) {
+    if (!bankItem || addedBankIds.has(bankItem.id)) return
+    if (questions.length >= 50) {
+      notify('An examination can have at most 50 questions.', true)
+      return
+    }
+    const newCard = {
+      _key: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      bankId: bankItem.id,
+      kind: bankItem.kind || 'single',
+      prompt: bankItem.prompt || '',
+      choices: Array.isArray(bankItem.choices) && bankItem.choices.length === 4 ? [...bankItem.choices] : ['', '', '', ''],
+      correct: Number(bankItem.correct ?? 0),
+      marks: Number(bankItem.marks || 1),
+      topic: bankItem.topic,
+      difficulty: bankItem.difficulty,
+    }
+    setQuestions(prev => {
+      const first = prev[0]
+      const firstIsBlank =
+        prev.length === 1 &&
+        !first.bankId &&
+        !first.prompt.trim() &&
+        first.choices.every(c => !c.trim())
+      return firstIsBlank ? [newCard] : [...prev, newCard]
+    })
+    notify('Added question from Question Bank.')
+  }
+
+  function handleDrop(e) {
+    e.preventDefault()
+    setDropActive(false)
+    const bankId = e.dataTransfer.getData('text/plain')
+    if (!bankId) return
+    const item = bank.find(q => q.id === bankId)
+    if (item) addFromBank(item)
   }
 
   async function handleSubmit(e) {
@@ -73,33 +109,34 @@ export default function CreateExamView({ notify, profile }) {
     setError('')
     setSaving(true)
     try {
-      const form = formRef.current
-      const data = new FormData(form)
-      const opensAt = new Date(data.get('opensAt'))
-      const closesAt = new Date(data.get('closesAt'))
-      if (closesAt <= opensAt) throw new Error('Closing time must be after opening time.')
+      const opens = new Date(opensAt)
+      const closes = new Date(closesAt)
+      if (closes <= opens) throw new Error('Closing time must be after opening time.')
 
-      const qEls = [...form.querySelectorAll('[data-question]')]
-      if (!qEls.length) throw new Error('Include at least one question.')
+      const inlineQuestions = questions.filter(q => q.kind === 'single')
+      const bankAssigned = questions.filter(q => q.kind !== 'single' && q.bankId)
 
-      const inlineQuestions = qEls.map(el => {
-        return {
-          prompt: el.querySelector('[name="prompt"]').value,
-          choices: [...el.querySelectorAll('[name="choice"]')].map(input => input.value),
-          correct: Number(el.querySelector('[name="correct"]')?.value ?? 0),
-          marks: Number(el.querySelector('[name="marks"]').value),
-          kind: 'single',
-        }
-      })
+      if (inlineQuestions.length === 0) {
+        throw new Error('Include at least one single-answer question before saving the draft.')
+      }
 
       const result = await examRequest('create', {
-        title: data.get('title'),
-        instructions: data.get('instructions'),
-        duration: Number(data.get('duration')),
-        opensAt: opensAt.toISOString(),
-        closesAt: closesAt.toISOString(),
-        questions: inlineQuestions,
+        title: title.trim(),
+        instructions: instructions.trim(),
+        duration: Number(duration),
+        opensAt: opens.toISOString(),
+        closesAt: closes.toISOString(),
+        questions: inlineQuestions.map(q => ({
+          prompt: q.prompt.trim(),
+          choices: q.choices.map(c => c.trim()),
+          correct: Number(q.correct),
+          marks: Number(q.marks),
+        })),
       })
+
+      for (const q of bankAssigned) {
+        await examRequest('assign', { examId: result.id, questionId: q.bankId })
+      }
 
       notify('Draft saved.')
       navigate(`/workspace/manage/${result.id}`)
@@ -110,7 +147,6 @@ export default function CreateExamView({ notify, profile }) {
     }
   }
 
-  const now = Date.now()
   const filteredBank = bank.filter(q =>
     (q.topic + ' ' + q.difficulty + ' ' + q.prompt).toLowerCase().includes(bankFilter.toLowerCase())
   )
@@ -118,40 +154,135 @@ export default function CreateExamView({ notify, profile }) {
   return (
     <div>
       <Breadcrumb back="Back to Examinations" backHref="/workspace" current="New examination" />
-      <PageHeader title="New examination" description="Add the schedule, instructions, and questions." />
+      <PageHeader
+        title="New examination"
+        description="Set the schedule and build questions manually or drag and drop from your Question Bank."
+      />
 
-      <div className="create-grid grid gap-4 items-start">
-        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+      <div className="create-grid grid gap-5 items-start">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Panel>
-            <h2>Exam details</h2>
-            <label className="form-label">Title <input className="form-input" name="title" required maxLength={150} /></label>
-            <label className="form-label">Candidate instructions <textarea className="form-textarea" name="instructions" maxLength={5000} rows={3} /></label>
+            <h2 className="mb-3">Exam details</h2>
+            <label className="form-label">
+              Title
+              <input className="form-input" required maxLength={150} value={title} onChange={e => setTitle(e.target.value)} />
+            </label>
+            <label className="form-label">
+              Candidate instructions
+              <textarea className="form-textarea" maxLength={5000} rows={3} value={instructions} onChange={e => setInstructions(e.target.value)} />
+            </label>
             <div className="schedule-fields grid gap-3">
-              <label className="form-label">Opens at <input className="form-input" type="datetime-local" name="opensAt" required defaultValue={inputDate(new Date(now))} /></label>
-              <label className="form-label">Closes at <input className="form-input" type="datetime-local" name="closesAt" required defaultValue={inputDate(new Date(now + 3600000))} /></label>
-              <label className="form-label">Duration (min) <input className="form-input" name="duration" type="number" min={1} max={480} defaultValue={30} required /></label>
+              <label className="form-label">
+                Opens at
+                <input className="form-input" type="datetime-local" required value={opensAt} onChange={e => setOpensAt(e.target.value)} />
+              </label>
+              <label className="form-label">
+                Closes at
+                <input className="form-input" type="datetime-local" required value={closesAt} onChange={e => setClosesAt(e.target.value)} />
+              </label>
+              <label className="form-label">
+                Duration (min)
+                <input className="form-input" type="number" min={1} max={480} required value={duration} onChange={e => setDuration(e.target.value)} />
+              </label>
             </div>
           </Panel>
 
-          <div className="space-y-3">
+          <p className="text-xs text-muted">
+            Drag questions from the Question Bank panel on the right and drop them below, or click Add.
+          </p>
+
+          <div
+            className={`space-y-3 rounded-xl transition-all ${dropActive ? 'ring-2 ring-dashed ring-ink bg-surface p-2' : ''}`}
+            onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; setDropActive(true) }}
+            onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDropActive(false) }}
+            onDrop={handleDrop}
+          >
             {questions.map((q, i) => (
-              <Panel key={q._key}>
+              <Panel key={q._key} className={q.bankId ? 'border-dashed bg-surface/60' : ''}>
                 <div className="flex justify-between items-center mb-3">
-                  <h3 className="font-semibold">Question {i + 1}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold">Question {i + 1}</h3>
+                    {q.bankId && (
+                      <span className="text-xs bg-soft text-ink rounded-full px-2.5 py-0.5 font-medium">
+                        From bank · {q.kind}
+                      </span>
+                    )}
+                  </div>
                   {questions.length > 1 && (
-                    <button type="button" className="btn-link text-sm text-error" onClick={() => removeQuestion(q._key)}>Remove</button>
+                    <button type="button" className="btn-link text-sm text-error" onClick={() => removeQuestion(q._key)}>
+                      Remove
+                    </button>
                   )}
                 </div>
-                <div data-question>
-                  <QuestionFormFields q={q} />
-                </div>
+
+                {q.kind !== 'single' && q.bankId ? (
+                  <div>
+                    <p className="font-medium text-sm mb-1">{q.prompt}</p>
+                    <p className="text-xs text-muted">{q.topic} · {q.difficulty} · {q.marks} marks</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <label className="form-label">
+                      Question text
+                      <textarea
+                        className="form-textarea"
+                        required
+                        maxLength={2000}
+                        rows={2}
+                        value={q.prompt}
+                        onChange={e => updateQuestion(q._key, { prompt: e.target.value })}
+                      />
+                    </label>
+                    <fieldset className="border border-line rounded-md p-3">
+                      <legend className="font-semibold text-sm px-1">Answer choices</legend>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                        {LETTERS.map((letter, idx) => (
+                          <label key={letter} className="form-label mb-0 text-sm">
+                            Choice {letter}
+                            <input
+                              className="form-input"
+                              required
+                              maxLength={500}
+                              value={q.choices[idx]}
+                              onChange={e => updateChoice(q._key, idx, e.target.value)}
+                            />
+                          </label>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="form-label mb-0 text-sm">
+                          Correct choice
+                          <select
+                            className="form-select"
+                            value={q.correct}
+                            onChange={e => updateQuestion(q._key, { correct: Number(e.target.value) })}
+                          >
+                            {LETTERS.map((letter, idx) => <option key={idx} value={idx}>{letter}</option>)}
+                          </select>
+                        </label>
+                        <label className="form-label mb-0 text-sm">
+                          Marks
+                          <input
+                            className="form-input"
+                            type="number"
+                            required
+                            min={1}
+                            max={100}
+                            value={q.marks}
+                            onChange={e => updateQuestion(q._key, { marks: e.target.value })}
+                          />
+                        </label>
+                      </div>
+                    </fieldset>
+                  </div>
+                )}
               </Panel>
             ))}
           </div>
 
           <div className="flex justify-between items-center flex-wrap gap-2">
-            <Button type="button" variant="secondary" onClick={addQuestion} disabled={questions.length >= 50}>
-              Add question
+            <Button type="button" variant="secondary" onClick={addBlankQuestion} disabled={questions.length >= 50}>
+              ＋ Add blank question
             </Button>
             <div className="flex items-center gap-3">
               <FormError>{error}</FormError>
@@ -160,29 +291,66 @@ export default function CreateExamView({ notify, profile }) {
           </div>
         </form>
 
-        {/* Bank sidebar */}
-        <Panel className="bank-sidebar">
+        {/* Sticky Draggable Question Bank Sidebar */}
+        <Panel className="bank-sidebar sticky top-6">
           <div className="flex justify-between items-center mb-3">
             <div>
               <h2>Question bank</h2>
-              <p className="text-xs text-muted">Refer to bank for question ideas</p>
+              <p className="text-xs text-muted">Drag &amp; drop or click Add</p>
             </div>
-            <span className="text-xs bg-soft text-muted rounded px-2 py-1">{bank.length}</span>
+            <span className="text-xs bg-soft text-muted rounded-full px-2.5 py-1 font-semibold">{bank.length}</span>
           </div>
           <label className="form-label mb-3 text-xs">
-            Filter
-            <input className="form-input text-xs" type="search" placeholder="Search topic, difficulty, text…"
-              value={bankFilter} onChange={e => setBankFilter(e.target.value)} />
+            Filter questions
+            <input
+              className="form-input text-xs"
+              type="search"
+              placeholder="Search topic, difficulty, text…"
+              value={bankFilter}
+              onChange={e => setBankFilter(e.target.value)}
+            />
           </label>
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
             {filteredBank.length === 0 ? (
-              <p className="text-muted text-xs">{bank.length ? 'No matches.' : 'No questions in bank yet.'}</p>
-            ) : filteredBank.map(q => (
-              <div key={q.id} className="border border-line rounded-md p-3 text-xs">
-                <p className="font-semibold mb-1 overflow-wrap-anywhere">{q.prompt}</p>
-                <span className="text-muted">{q.topic} · {q.difficulty} · {q.kind} · {q.marks}m</span>
-              </div>
-            ))}
+              <p className="text-muted text-xs">
+                {bank.length ? 'No matches.' : <>No questions in bank yet. <Link to="/workspace/bank" className="underline">Create one</Link>.</>}
+              </p>
+            ) : (
+              filteredBank.map(q => {
+                const isAdded = addedBankIds.has(q.id)
+                return (
+                  <div
+                    key={q.id}
+                    draggable={!isAdded}
+                    onDragStart={e => {
+                      if (isAdded) { e.preventDefault(); return }
+                      e.dataTransfer.setData('text/plain', q.id)
+                      e.dataTransfer.effectAllowed = 'copy'
+                    }}
+                    className={`border rounded-lg p-3 text-xs flex items-start gap-2 transition-opacity ${
+                      isAdded
+                        ? 'border-line bg-surface opacity-55 cursor-not-allowed'
+                        : 'border-line bg-white cursor-grab hover:border-ink/40 hover:shadow-sm'
+                    }`}
+                  >
+                    <span className="text-muted select-none pt-0.5" aria-hidden="true">⋮⋮</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold mb-1 overflow-wrap-anywhere">{q.prompt}</p>
+                      <span className="text-muted">{q.topic} · {q.difficulty} · {q.kind} · {q.marks}m</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={isAdded}
+                      onClick={() => addFromBank(q)}
+                      className="text-xs px-2.5 py-1 min-h-0 flex-none"
+                    >
+                      {isAdded ? 'Added ✓' : '＋ Add'}
+                    </Button>
+                  </div>
+                )
+              })
+            )}
           </div>
         </Panel>
       </div>

@@ -1,6 +1,6 @@
-// Content preserved from the original UnCooked design.
+// Content for the UnCooked public landing page (no em-dashes).
 export const steps = [
-  ['01', 'Sign in to your workspace', 'Use the credentials provided by your institution administrator to enter your dedicated role workspace—Administrator, Examiner, or Candidate.'],
+  ['01', 'Sign in to your workspace', 'Use the credentials provided by your institution administrator to enter your dedicated role workspace: Administrator, Examiner, or Candidate.'],
   ['02', 'Build from the Question Bank', 'Examiners organize reusable MCQs, multi-select, and written questions, then drag and drop them directly into scheduled examinations.'],
   ['03', 'Take the exam with live sync', 'Candidates start within the server-enforced window, flag questions for review, and work seamlessly even if the connection flickers.'],
   ['04', 'Grade, publish & verify PDFs', 'Examiners monitor incidents, grade written responses, publish results, and issue cryptographically verifiable PDF score reports.'],
@@ -12,10 +12,52 @@ export const roleCards = [
   ['Administrators', 'Govern & scale', 'Manage user accounts, roles, and access states, or bulk-import hundreds of candidates via editable JSON preview.', '◆'],
 ]
 
+export const capabilities = [
+  [
+    '01 · Integrity',
+    'Server-enforced timing & live sync',
+    'Deadlines are computed on the server. Refreshing the tab, switching networks, or changing the device clock never grants extra time.',
+    'Clock lock & dual local/cloud autosave keep every response safe without allowing time tampering.',
+    ['Server clock lock: Active', 'Local + cloud autosave: 100% synced'],
+  ],
+  [
+    '02 · Authoring',
+    'Drag-and-drop Question Bank',
+    'Maintain reusable single-choice, multiple-select, and written questions. Drag them straight into new exams.',
+    'Built-in duplicate protection disables already-added questions automatically so exams stay clean.',
+    ['Single & Multi-select MCQ', 'Duplicate-safe drag & drop'],
+  ],
+  [
+    '03 · Scale',
+    'Editable JSON Bulk Import',
+    'Import up to 200 users or questions at once, edit any row inline in the preview, and fix issues before committing.',
+    'Spot duplicate emails or missing fields immediately and correct them right inside the browser.',
+    ['Up to 200 records per batch', 'Inline row validation & edit'],
+  ],
+  [
+    '04 · Analytics & Reports',
+    'Instant grading & verifiable PDFs',
+    'Review question difficulty, grade written responses inline, publish results, and issue PDF scorecards with verification codes.',
+    'Every published report carries a cryptographic verification token that institutions can validate anytime.',
+    ['Exact-match multi-select marking', 'Incident signals', 'PDF verification token'],
+  ],
+]
+
+export const trustedLogos = [
+  'COMSATS University',
+  'NUST Islamabad',
+  'LUMS',
+  'FAST NUCES',
+  'GIKI',
+  'UET Lahore',
+  'IBA Karachi',
+  'Virtual University',
+]
+
 export const faqs = [
   ['What happens if a candidate refreshes or loses internet mid-exam?', 'Every answer and review flag is saved both locally and to the server. When the candidate reconnects or refreshes, their exact progress and server-enforced deadline are restored automatically.'],
   ['Can a candidate extend their exam time by changing their device clock?', 'No. All start times, deadlines, and auto-submissions are enforced by the server clock, ensuring strict fairness across every attempt.'],
-  ['How does bulk JSON import work for users and questions?', 'Upload a JSON array of up to 200 records, preview and edit any field inline—including fixing duplicate emails or typos—and confirm the import in one click.'],
+  ['How does bulk JSON import work for users and questions?', 'Upload a JSON array of up to 200 records, preview and edit any field inline, including fixing duplicate emails or typos, and confirm the import in one click.'],
   ['How can institutions verify a candidate’s PDF report?', 'Every published PDF report includes a unique verification token and link that anyone can validate against the public verification endpoint.'],
 ]
 

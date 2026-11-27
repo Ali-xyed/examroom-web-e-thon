@@ -1,5 +1,7 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { PageHeader, Pill, MetadataList } from '../components/ui.jsx'
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { examRequest } from '../api.js'
+import { PageHeader, Pill, MetadataList, Button } from '../components/ui.jsx'
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 function date(value) { return dateFormat.format(new Date(value)) }
@@ -23,6 +25,7 @@ export default function HomeView({ dashboard, onReload, notify }) {
   const now = Date.parse(serverTime)
   const examiner = profile.role === 'examiner'
   const candidate = profile.role === 'candidate'
+  const [deletingId, setDeletingId] = useState(null)
 
   const title = candidate ? 'My examinations' : examiner ? 'Examinations' : 'Platform overview'
   const descriptions = {
@@ -31,20 +34,27 @@ export default function HomeView({ dashboard, onReload, notify }) {
     administrator: 'View examination activity across the platform.',
   }
 
+  async function handleDeleteExam(exam) {
+    if (!window.confirm(`Delete examination "${exam.title}"? This action cannot be undone.`)) return
+    setDeletingId(exam.id)
+    try {
+      await examRequest('exam_delete', { examId: exam.id })
+      notify('Examination deleted.')
+      await onReload()
+    } catch (err) {
+      notify(err.message, true)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   return (
     <div>
       <PageHeader
         title={title}
         description={descriptions[profile.role]}
-        action={examiner ? <Link to="/workspace/create" className="btn-primary">New examination</Link> : null}
+        action={examiner ? <Link to="/workspace/create" className="btn-primary">＋ New examination</Link> : null}
       />
-      {profile.role !== 'candidate' && (
-        <div className="flex gap-2 mb-4">
-          <Link to="/workspace/import" className="btn-secondary">Bulk import</Link>
-          {examiner && <Link to="/workspace/bank" className="btn-secondary">Question bank</Link>}
-          {profile.role === 'administrator' && <Link to="/workspace/users" className="btn-secondary">Manage users</Link>}
-        </div>
-      )}
 
       <section className="exam-list grid gap-3" aria-label="Examinations">
         {exams.length ? (
@@ -65,9 +75,19 @@ export default function HomeView({ dashboard, onReload, notify }) {
                     ['Duration', `${exam.duration} min`],
                   ]} />
                 </div>
-                <div className="exam-card-actions flex gap-2 flex-none">
+                <div className="exam-card-actions flex gap-2 flex-none flex-wrap justify-end">
                   {examiner && (
-                    <Link to={`/workspace/manage/${exam.id}`} className="btn-secondary">Manage exam</Link>
+                    <>
+                      <Link to={`/workspace/manage/${exam.id}`} className="btn-secondary">Manage exam</Link>
+                      <Button
+                        variant="secondary"
+                        className="text-error"
+                        disabled={deletingId === exam.id}
+                        onClick={() => handleDeleteExam(exam)}
+                      >
+                        {deletingId === exam.id ? 'Deleting…' : 'Delete'}
+                      </Button>
+                    </>
                   )}
                   {open && (
                     <Link to={`/exam/${exam.id}`} className="btn-primary">Open exam</Link>

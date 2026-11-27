@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Routes, Route, useNavigate, Link, useLocation } from 'react-router-dom'
+import { Routes, Route, useNavigate } from 'react-router-dom'
 import { examRequest, signOut, hasSession } from '../api.js'
 import { useNotice, Notice, Button } from '../components/ui.jsx'
 import Brand from '../components/Brand.jsx'
+import WorkspaceSidebar from '../components/WorkspaceSidebar.jsx'
 
 // Sub-pages
 import HomeView from '../views/HomeView.jsx'
@@ -19,17 +20,17 @@ import DisputesView from '../views/DisputesView.jsx'
 import AuditView from '../views/AuditView.jsx'
 import FairnessView from '../views/FairnessView.jsx'
 import DatesheetView from '../views/DatesheetView.jsx'
-
-const roles = { administrator: 'Administrator', examiner: 'Examiner', candidate: 'Candidate' }
+import SettingsView from '../views/SettingsView.jsx'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { notice, notify } = useNotice()
   const [dashboard, setDashboard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [online, setOnline] = useState(() => navigator.onLine)
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('uncooked-sidebar-collapsed') === '1')
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine)
@@ -40,6 +41,14 @@ export default function DashboardPage() {
       window.removeEventListener('offline', update)
     }
   }, [])
+
+  function toggleCollapse() {
+    setCollapsed(prev => {
+      const next = !prev
+      localStorage.setItem('uncooked-sidebar-collapsed', next ? '1' : '0')
+      return next
+    })
+  }
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
@@ -67,7 +76,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
-        <p className="text-muted">Loading…</p>
+        <p className="text-muted">Loading workspace…</p>
       </div>
     )
   }
@@ -88,84 +97,53 @@ export default function DashboardPage() {
   }
 
   const { profile } = dashboard
-  const currentPath = location.pathname
-
-  const navItems =
-    profile.role === 'examiner'
-      ? [
-          ['/workspace', 'Examinations'],
-          ['/workspace/bank', 'Question bank'],
-          ['/workspace/create', 'New examination'],
-          ['/workspace/import', 'Bulk import'],
-        ]
-      : profile.role === 'administrator'
-      ? [
-          ['/workspace', 'Overview'],
-          ['/workspace/users', 'Manage users'],
-          ['/workspace/import', 'Bulk import'],
-        ]
-      : [['/workspace', 'My examinations']]
 
   return (
-    <div className="workspace-shell min-h-screen bg-white">
-      {/* Top Bar */}
-      <header className="workspace-header sticky top-0 z-10 bg-white/95 border-b border-line backdrop-blur-md">
-        <div className="workspace-header-inner flex gap-4 justify-between items-center">
+    <div className="workspace-shell min-h-screen flex bg-[#fafaf9]">
+      <WorkspaceSidebar
+        profile={profile}
+        online={online}
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapse}
+        mobileOpen={mobileOpen}
+        onCloseMobile={() => setMobileOpen(false)}
+        onSignOut={handleSignOut}
+      />
+
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Mobile header (hidden on lg+) */}
+        <header className="lg:hidden sticky top-0 z-20 flex items-center justify-between px-4 h-14 bg-white border-b border-line">
           <Brand to="/workspace" />
-          <div className="flex items-center gap-3">
-            <div className="account-label text-right leading-tight">
-              <div className="font-semibold text-[0.93rem]">{profile.name}</div>
-              <div className="text-muted text-[0.85rem]">{roles[profile.role]}</div>
-            </div>
-            <Button variant="secondary" onClick={handleSignOut}>Sign out</Button>
-          </div>
-        </div>
-      </header>
+          <button
+            type="button"
+            className="btn-secondary px-3 py-1.5 text-xs"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open navigation menu"
+          >
+            Menu
+          </button>
+        </header>
 
-      {/* Workspace nav bar */}
-      <div className="workspace-bar">
-        <div className="workspace-bar-inner">
-          <nav className="workspace-nav" aria-label="Workspace navigation">
-            {navItems.map(([href, label]) => {
-              const active = currentPath === href || (href === '/workspace' && currentPath.startsWith('/workspace/') && !navItems.slice(1).some(([h]) => currentPath.startsWith(h)))
-              return (
-                <Link
-                  key={href}
-                  to={href}
-                  className={`workspace-link ${active ? 'active' : ''}`}
-                  aria-current={active ? 'page' : undefined}
-                >
-                  {label}
-                </Link>
-              )
-            })}
-          </nav>
-          <div className="workspace-status" role="status">
-            <span className={`conn-dot ${online ? 'online' : 'offline'}`} aria-hidden="true" />
-            {online ? 'Connected' : 'Offline'}
-          </div>
-        </div>
+        <main className="workspace-main flex-1 w-full">
+          <Routes>
+            <Route index element={<HomeView dashboard={dashboard} onReload={loadDashboard} notify={notify} />} />
+            <Route path="create" element={<CreateExamView notify={notify} profile={profile} />} />
+            <Route path="manage/:id" element={<ManageExamView notify={notify} profile={profile} />} />
+            <Route path="bank" element={<BankView notify={notify} profile={profile} />} />
+            <Route path="users" element={<UsersView notify={notify} />} />
+            <Route path="import" element={<ImportView notify={notify} profile={profile} />} />
+            <Route path="settings" element={<SettingsView profile={profile} notify={notify} />} />
+            <Route path="result/:id" element={<ResultView notify={notify} profile={profile} />} />
+            <Route path="monitor/:id" element={<MonitorView notify={notify} profile={profile} />} />
+            <Route path="analytics/:id" element={<AnalyticsView notify={notify} />} />
+            <Route path="sandbox/:id" element={<SandboxView notify={notify} profile={profile} dashboard={dashboard} />} />
+            <Route path="disputes/:id" element={<DisputesView notify={notify} profile={profile} />} />
+            <Route path="audit/:id" element={<AuditView notify={notify} />} />
+            <Route path="fairness/:id" element={<FairnessView notify={notify} />} />
+            <Route path="datesheet/:id" element={<DatesheetView notify={notify} />} />
+          </Routes>
+        </main>
       </div>
-
-      {/* Main content */}
-      <main className="workspace-main">
-        <Routes>
-          <Route index element={<HomeView dashboard={dashboard} onReload={loadDashboard} notify={notify} />} />
-          <Route path="create" element={<CreateExamView notify={notify} profile={profile} />} />
-          <Route path="manage/:id" element={<ManageExamView notify={notify} profile={profile} />} />
-          <Route path="bank" element={<BankView notify={notify} profile={profile} />} />
-          <Route path="users" element={<UsersView notify={notify} />} />
-          <Route path="import" element={<ImportView notify={notify} profile={profile} />} />
-          <Route path="result/:id" element={<ResultView notify={notify} profile={profile} />} />
-          <Route path="monitor/:id" element={<MonitorView notify={notify} profile={profile} />} />
-          <Route path="analytics/:id" element={<AnalyticsView notify={notify} />} />
-          <Route path="sandbox/:id" element={<SandboxView notify={notify} profile={profile} dashboard={dashboard} />} />
-          <Route path="disputes/:id" element={<DisputesView notify={notify} profile={profile} />} />
-          <Route path="audit/:id" element={<AuditView notify={notify} />} />
-          <Route path="fairness/:id" element={<FairnessView notify={notify} />} />
-          <Route path="datesheet/:id" element={<DatesheetView notify={notify} />} />
-        </Routes>
-      </main>
 
       <Notice message={notice.message} error={notice.error} />
     </div>

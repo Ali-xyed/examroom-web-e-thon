@@ -4,8 +4,11 @@ import { hasSession } from '../api.js'
 import Brand from './Brand.jsx'
 
 const navigation = [
-  ['roles', 'Workspaces'], ['how', 'How it works'], ['demo', 'Live demo'],
-  ['features', 'Features'], ['faq', 'FAQ'],
+  ['demo', 'Demo'],
+  ['roles', 'Workspaces'],
+  ['how', 'How it works'],
+  ['features', 'Capabilities'],
+  ['faq', 'FAQ'],
 ]
 
 export default function PublicHeader() {

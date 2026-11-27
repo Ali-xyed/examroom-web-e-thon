@@ -1,57 +1,69 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import ProductPreview from '../components/ProductPreview.jsx'
 import PublicHeader from '../components/PublicHeader.jsx'
 import LandingFooter from '../components/LandingFooter.jsx'
 import useLandingEffects from '../hooks/useLandingEffects.js'
-import { steps, roleCards, faqs } from '../landingContent.js'
+import { steps, roleCards, capabilities, trustedLogos, faqs } from '../landingContent.js'
 import '../styles/public-site.css'
 
 const avatars = ['pile-1.webp', 'pile-2.webp', 'pile-3.webp', 'pile-4.webp', 'folder-face.svg', 'glasses-face.svg', 'squiggle-face.svg']
-const technologies = ['React + Node.js', 'Supabase Auth & RLS', 'PostgreSQL', 'Local answer recovery', 'Vercel']
 
 export default function LandingPage() {
   const pageRef = useRef(null)
+  const [activeCap, setActiveCap] = useState(0)
   useLandingEffects(pageRef)
+
   return (
     <div className="public-site" data-view="landing" ref={pageRef}>
       <a className="skip" href="#main">Skip to content</a>
       <PublicHeader />
       <main id="main" tabIndex={-1}>
+        {/* Centered Hero matching screenshot */}
         <section className="landing-hero">
           <div className="hero-glow" aria-hidden="true" />
-          <div className="hero-grid">
-            <div className="hero-copy">
-              <span className="hero-pill reveal-3d" data-reveal="up"><i aria-hidden="true" />Server-enforced timing &amp; live autosave</span>
-              <div className="hero-avatars reveal-3d" data-reveal="up" aria-hidden="true">
-                {avatars.map(name => <img key={name} src={`/reference/${name}`} alt="" width="48" height="48" />)}
-              </div>
-              <h1 className="reveal-3d" data-reveal="up">
-                <span>Where institutions</span>
-                <span className="hero-second">run <span className="hero-highlight"><i aria-hidden="true" />online exams</span></span>
-              </h1>
-              <p className="hero-description reveal-3d" data-reveal="up">Create scheduled exams, drag and drop from your Question Bank, and deliver timed assessments with offline-resilient autosave and verified PDF reports.</p>
-              <div className="hero-actions reveal-3d" data-reveal="up">
-                <Link className="button primary hero-cta" to="/login">Sign in to workspace <span aria-hidden="true">→</span></Link>
-                <a className="button secondary" href="#demo">Explore live demo</a>
-              </div>
-              <div className="hero-trust reveal-3d" data-reveal="up">
-                {['Role-based access', 'Offline-safe recovery', 'Verified PDF reports'].map(label => <span key={label}><i aria-hidden="true" />{label}</span>)}
-              </div>
+          <div className="hero-copy">
+            <div className="hero-avatars reveal-3d" data-reveal="up" aria-hidden="true">
+              {avatars.map(name => <img key={name} src={`/reference/${name}`} alt="" width="56" height="56" />)}
             </div>
-            <ProductPreview />
+            <h1 className="reveal-3d" data-reveal="up">
+              <span>Where institutions</span>
+              <span className="hero-second">run <span className="hero-highlight"><i aria-hidden="true" />online exams</span></span>
+            </h1>
+            <p className="hero-description reveal-3d" data-reveal="up">
+              Create scheduled exams, enroll candidates, and run timed assessments with automatic answer saving.
+            </p>
+            <div className="hero-actions reveal-3d" data-reveal="up">
+              <Link className="button primary hero-cta" to="/login">Sign in</Link>
+              <a className="button secondary" href="#demo">See the demo</a>
+            </div>
+            <p className="hero-note reveal-3d" data-reveal="up">Web-e-Thon · Accounts are created by your administrator</p>
+          </div>
+          <ProductPreview />
+        </section>
+
+        {/* Infinite-scrolling Trusted By Logo Marquee */}
+        <section className="trusted-section reveal-3d" data-reveal="up" aria-label="Trusted institutions">
+          <p>Trusted by leading academic teams &amp; examination boards</p>
+          <div className="marquee-wrap">
+            <div className="marquee-track">
+              {[...trustedLogos, ...trustedLogos].map((name, idx) => (
+                <span key={`${name}-${idx}`} className="marquee-item">
+                  <i aria-hidden="true" />
+                  {name}
+                </span>
+              ))}
+            </div>
           </div>
         </section>
-        <section className="tool-section reveal-3d" data-reveal="up" aria-label="Technology">
-          <p>Engineered for reliability at scale</p>
-          <ul>{technologies.map(name => <li key={name}>{name}</li>)}</ul>
-        </section>
+
+        {/* Workspaces (#roles) */}
         <section className="roles-section" id="roles">
           <div className="landing-container">
-            <div className="section-head reveal-3d" data-reveal="up">
-              <div className="section-label">Three dedicated workspaces</div>
+            <div className="section-head center reveal-3d" data-reveal="up">
+              <div className="section-label">Workspaces</div>
               <h2>One platform. Every role covered.</h2>
-              <p className="section-intro">Tailored interfaces for examiners, candidates, and administrators—each with clear controls and zero clutter.</p>
+              <p className="section-intro">Tailored interfaces for examiners, candidates, and administrators, each with clear controls and zero clutter.</p>
             </div>
             <div className="roles-grid">
               {roleCards.map(([role, subtitle, body, icon], i) => (
@@ -64,6 +76,8 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        {/* How It Works (#how) */}
         <section className="how-section" id="how">
           <div className="landing-container">
             <div className="section-head center reveal-3d" data-reveal="up">
@@ -86,42 +100,47 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        {/* Interactive Revealing Capabilities (#features) */}
         <section className="feature-section" id="features">
           <div className="landing-container">
-            <div className="feature-heading reveal-3d" data-reveal="up">
-              <div><div className="section-label">Capabilities</div><h2>Built like a real-world exam engine</h2></div>
-              <p className="section-intro">Every detail—from drag-and-drop authoring to tamper-proof deadlines—works out of the box.</p>
+            <div className="section-head center reveal-3d" data-reveal="up">
+              <div className="section-label">Capabilities</div>
+              <h2>Built like a real-world exam engine</h2>
+              <p className="section-intro">Click or hover any capability card to reveal its live workflow details.</p>
             </div>
-            <div className="bento-grid">
-              <article className="bento-card bento-wide tilt-3d reveal-3d" data-reveal="up">
-                <div className="bento-meta">01 · Integrity</div>
-                <h3>Server-enforced timing &amp; live sync</h3>
-                <p>Deadlines are computed on the server. Refreshing the tab, switching networks, or changing the device clock never grants extra time.</p>
-                <div className="bento-meter" aria-hidden="true">
-                  <div className="bento-meter-row"><span>Server clock lock</span><strong>Active</strong></div>
-                  <div className="bento-bar"><span style={{ width: '92%' }} /></div>
-                  <div className="bento-meter-row"><span>Local + cloud autosave</span><strong>100% synced</strong></div>
-                  <div className="bento-bar"><span style={{ width: '100%' }} /></div>
-                </div>
-              </article>
-              <article className="bento-card tilt-3d reveal-3d" data-reveal="up" style={{ '--delay': '80ms' }}>
-                <div className="bento-meta">02 · Authoring</div><h3>Drag-and-drop Question Bank</h3>
-                <p>Maintain reusable single-choice, multiple-select, and written questions. Drag them straight into new exams.</p>
-              </article>
-              <article className="bento-card tilt-3d reveal-3d" data-reveal="up" style={{ '--delay': '120ms' }}>
-                <div className="bento-meta">03 · Scale</div><h3>Editable JSON Bulk Import</h3>
-                <p>Import up to 200 users or questions at once, edit any row inline in the preview, and fix issues before committing.</p>
-              </article>
-              <article className="bento-card bento-wide tilt-3d reveal-3d" data-reveal="up" style={{ '--delay': '160ms' }}>
-                <div className="bento-meta">04 · Analytics &amp; Reports</div><h3>Instant grading, analytics &amp; verifiable PDFs</h3>
-                <p>Review question difficulty, grade written responses inline, publish results, and issue PDF scorecards with verification codes.</p>
-                <div className="bento-chips" aria-hidden="true">
-                  <span>✓ Exact-match multi-select marking</span><span>✓ Incident signals</span><span>✓ PDF verification token</span>
-                </div>
-              </article>
+            <div className="cap-grid">
+              {capabilities.map(([meta, title, summary, detail, chips], i) => {
+                const isOpen = activeCap === i
+                return (
+                  <article
+                    key={meta}
+                    className={`cap-card tilt-3d reveal-3d ${isOpen ? 'is-open' : ''}`}
+                    data-reveal="up"
+                    style={{ '--delay': `${i * 60}ms` }}
+                    onMouseEnter={() => setActiveCap(i)}
+                    onClick={() => setActiveCap(i)}
+                  >
+                    <div className="cap-card-head">
+                      <span className="bento-meta">{meta}</span>
+                      <span className="cap-indicator" aria-hidden="true">{isOpen ? 'Active' : 'Explore'}</span>
+                    </div>
+                    <h3>{title}</h3>
+                    <p>{summary}</p>
+                    <div className="cap-reveal">
+                      <p className="cap-detail">{detail}</p>
+                      <div className="bento-chips">
+                        {chips.map(chip => <span key={chip}>✓ {chip}</span>)}
+                      </div>
+                    </div>
+                  </article>
+                )
+              })}
             </div>
           </div>
         </section>
+
+        {/* FAQ (#faq) */}
         <section className="faq-section" id="faq">
           <div className="landing-container">
             <div className="section-head center reveal-3d" data-reveal="up"><div className="section-label">Questions</div><h2>Frequently asked</h2></div>
@@ -134,6 +153,8 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+        {/* Final CTA */}
         <section className="cta-section reveal-3d" data-reveal="up">
           <div className="landing-container"><div className="cta-card tilt-3d">
             <div className="cta-glow" aria-hidden="true" /><h2>Ready to conduct your next exam?</h2>
@@ -144,6 +165,7 @@ export default function LandingPage() {
             </div>
           </div></div>
         </section>
+
         <LandingFooter />
       </main>
     </div>
