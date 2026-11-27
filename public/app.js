@@ -1,3 +1,4 @@
+import { candidateDirectory } from './candidate-directory.js'
 import { examRequest, hasSession, signIn, signOut } from './api.js'
 import { phaseThree, verification, downloadReport, workspaceTools, readLocal, writeLocal, removeLocal } from './phase-three.js'
 import { phaseTwo, examTools } from './phase-two.js'
@@ -366,12 +367,9 @@ function manage(id, data) {
     </section><section class="panel form-panel"><h2>Candidates</h2>
       <form id="enroll"><div class="inline-form"><label>Candidate email<input name="email" type="email" required></label>
         <button type="submit" class="secondary">Enroll</button></div><p class="form-error" data-error role="alert"></p></form>
-      ${candidates.length ? '<ul class="roster">' + candidates.map(candidate => `
-        <li><div><strong>${safe(candidate.name)}</strong><small>${safe(candidate.email)}</small></div>
-        <div><span class="pill ${candidate.submittedAt ? 'available' : ''}">${candidate.submittedAt ? 'Submitted' : candidate.startedAt ? 'In progress' : 'Enrolled'}</span>
-        ${candidate.submittedAt ? '<small>' + date(candidate.submittedAt) + '</small>' : ''}</div></li>`).join('') + '</ul>'
-        : '<p class="muted">No candidates enrolled.</p>'}
+      <div id="candidate-directory"></div>
     </section></div>`)
+  void candidateDirectory(id, {safe,notify})
   void examTools(id, {safe,notify})
   bindForm('#enroll', async data => {
     const fresh = await examRequest('enroll', { examId: id, email: data.get('email') })

@@ -14,6 +14,8 @@ const files = new Map([
   ['/phase-three.js', ['phase-three.js', 'text/javascript']],
   ['/import-preview.js', ['import-preview.js', 'text/javascript']],
   ['/report-pdf.js', ['report-pdf.js', 'text/javascript']],
+  ['/candidate-directory.js', ['candidate-directory.js', 'text/javascript']],
+  ['/fonts/DejaVuSans-Bold.ttf', ['fonts/DejaVuSans-Bold.ttf', 'font/ttf']],
   ['/vendor/jspdf.umd.min.js', ['vendor/jspdf.umd.min.js', 'text/javascript']],
   ['/fonts/DejaVuSans.ttf', ['fonts/DejaVuSans.ttf', 'font/ttf']],
   ['/users.js', ['users.js', 'text/javascript']],

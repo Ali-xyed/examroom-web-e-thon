@@ -107,6 +107,14 @@ label { font-weight: 500; gap: .45rem; }
 .roster li > div:last-child { text-align: right; }
 .roster small { margin-top: .35rem; font-size: .8rem; }
 .roster .pill { white-space: nowrap; }
+.candidate-directory-tools { display: grid; grid-template-columns: 1fr; gap: .25rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+.candidate-directory-tools label { font-size: .85rem; }
+.directory-count { font-size: .8rem; margin-bottom: .6rem; }
+.candidate-directory-list { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.candidate-entry { display: flex; gap: .75rem; align-items: center; padding: .9rem .3rem; border-bottom: 1px solid var(--line); }
+.candidate-entry:first-child { border-top: 1px solid var(--line); }
+.candidate-entry .pill { width: fit-content; white-space: nowrap; }
+.candidate-entry button { flex: none; }
 .attempt-grid { grid-template-columns: minmax(0, 1fr) 320px; }
 .attempt-sidebar { position: sticky; top: 84px; }
 .attempt-sidebar .legend { margin-block: 1rem; }
