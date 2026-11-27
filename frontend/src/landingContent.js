@@ -26,4 +26,3 @@ export const examRows = [
   ['SE201', 'Software engineering', '02:00 PM', '30 min'],
   ['NET101', 'Computer networks', '03:00 PM', '25 min'],
 ]
-
