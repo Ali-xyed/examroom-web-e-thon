@@ -1,0 +1,7 @@
+agent
+backend
+frontend
+supabase
+scripts/smoke.mjs
+.env*
+dist

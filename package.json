@@ -1,0 +1,13 @@
+{
+  "name": "examroom",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node --env-file-if-exists=.env scripts/build.mjs",
+    "dev": "node --env-file-if-exists=.env scripts/dev.mjs",
+    "smoke": "node --env-file-if-exists=.env scripts/smoke.mjs",
+    "check": "node --check public/app.js && node --check public/api.js && node --check scripts/build.mjs && node --check scripts/dev.mjs && node --check scripts/smoke.mjs"
+  },
+  "engines": { "node": ">=22" }
+}
