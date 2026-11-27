@@ -3,7 +3,10 @@ import { createClient } from '@supabase/supabase-js'
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY,
-  { auth: { autoRefreshToken: false, persistSession: false } }
+  {
+    auth: { autoRefreshToken: false, persistSession: false },
+    db: { schema: 'examroom' },
+  }
 )
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
@@ -17,7 +20,6 @@ async function verifyExaminer(req) {
   if (error || !data?.user) return null
 
   const { data: prof } = await supabase
-    .schema('examroom')
     .from('profiles')
     .select('id, role, active')
     .eq('id', data.user.id)

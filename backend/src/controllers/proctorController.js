@@ -5,13 +5,23 @@ import multer from 'multer'
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY,
+  {
+    auth: { autoRefreshToken: false, persistSession: false },
+    db: { schema: 'examroom' },
+  }
+)
+
+// Also create a storage-only client (storage uses default public schema)
+const supabaseStorage = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY,
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-// Multer: memory storage, 100 KB limit, jpeg only
+// Multer: memory storage, 150 KB limit, jpeg only
 const multerUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 102400 },
+  limits: { fileSize: 153600 },
   fileFilter(_req, file, cb) {
     if (file.mimetype === 'image/jpeg') cb(null, true)
     else cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'Only JPEG images are accepted.'))
@@ -33,7 +43,9 @@ async function verifyJwt(req) {
 //   - multipart/form-data: captureId, attemptId, examId, flags (JSON array), image (JPEG ≤ 100 KB)
 //   - application/json: { captureId, attemptId, examId, flags, missed: true } when camera denied/unavailable
 export async function upload(req, res) {
-  if (req.is('application/json')) {
+  const contentType = (req.headers['content-type'] || '').toLowerCase()
+
+  if (contentType.includes('application/json')) {
     try {
       const user = await verifyJwt(req)
       if (!user) return res.status(401).json({ error: 'Unauthorized.' })
@@ -47,7 +59,6 @@ export async function upload(req, res) {
         return res.status(400).json({ error: 'Invalid UUID format.' })
 
       const { data: attempt, error: attemptErr } = await supabase
-        .schema('examroom')
         .from('attempts')
         .select('id, candidate_id, exam_id, submitted_at, deadline')
         .eq('id', attemptId)
@@ -60,7 +71,6 @@ export async function upload(req, res) {
         return res.status(403).json({ error: 'Active attempt not found or access denied.' })
 
       const { error: dbErr } = await supabase
-        .schema('examroom')
         .from('proctor_captures')
         .upsert({
           id:           captureId,
@@ -76,8 +86,8 @@ export async function upload(req, res) {
         return res.status(500).json({ error: 'Database insert failed: ' + dbErr.message })
 
       return res.json({ ok: true, missed: true })
-    } catch {
-      return res.status(500).json({ error: 'Internal server error.' })
+    } catch (e) {
+      return res.status(500).json({ error: 'Internal server error: ' + (e.message || '') })
     }
   }
 
@@ -114,12 +124,11 @@ export async function upload(req, res) {
       if (!req.file) return res.status(400).json({ error: 'Image file is required.' })
       if (req.file.mimetype !== 'image/jpeg')
         return res.status(400).json({ error: 'Only JPEG images are accepted.' })
-      if (req.file.size > 102400)
-        return res.status(400).json({ error: 'Image exceeds the 100 KB limit.' })
+      if (req.file.size > 153600)
+        return res.status(400).json({ error: 'Image exceeds the 150 KB limit.' })
 
-      // 4. Verify attempt belongs to caller, is active, and exam uses snapshots proctoring
+      // 4. Verify attempt belongs to caller, is active
       const { data: attempt, error: attemptErr } = await supabase
-        .schema('examroom')
         .from('attempts')
         .select('id, candidate_id, exam_id, submitted_at, deadline')
         .eq('id', attemptId)
@@ -133,7 +142,6 @@ export async function upload(req, res) {
 
       // 5. Confirm exam proctoring mode
       const { data: exam, error: examErr } = await supabase
-        .schema('examroom')
         .from('exams')
         .select('id, proctoring_mode')
         .eq('id', examId)
@@ -145,9 +153,9 @@ export async function upload(req, res) {
       if (exam.proctoring_mode !== 'snapshots')
         return res.status(403).json({ error: 'Proctoring is not enabled for this exam.' })
 
-      // 6. Upload to Supabase Storage
+      // 6. Upload to Supabase Storage (use the storage client, not the examroom-schema one)
       const storagePath = `${examId}/${attemptId}/${captureId}.jpg`
-      const { error: storageErr } = await supabase.storage
+      const { error: storageErr } = await supabaseStorage.storage
         .from('proctor-captures')
         .upload(storagePath, req.file.buffer, {
           contentType: 'image/jpeg',
@@ -159,7 +167,6 @@ export async function upload(req, res) {
 
       // 7. Upsert proctor_captures row
       const { error: dbErr } = await supabase
-        .schema('examroom')
         .from('proctor_captures')
         .upsert({
           id:           captureId,
@@ -176,27 +183,26 @@ export async function upload(req, res) {
 
       return res.json({ ok: true })
     } catch (e) {
-      return res.status(500).json({ error: 'Internal server error.' })
+      return res.status(500).json({ error: 'Internal server error: ' + (e.message || '') })
     }
   })
 }
 
-// ─── signedUrl ────────────────────────────────────────────────────────────────
-// GET /api/proctor/image/:captureId
+// ─── getSignedUrl ────────────────────────────────────────────────────────────────
+// GET /api/proctor/image?captureId=xxx
 // Examiner retrieves a 60-second signed URL for a capture
-export async function signedUrl(req, res) {
+export async function getSignedUrl(req, res) {
   try {
     const user = await verifyJwt(req)
     if (!user) return res.status(401).json({ error: 'Unauthorized.' })
 
-    const { captureId } = req.params
+    const captureId = req.params?.captureId || req.query?.captureId
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    if (!uuidRe.test(captureId))
+    if (!captureId || !uuidRe.test(captureId))
       return res.status(400).json({ error: 'Invalid captureId.' })
 
     // Fetch capture
     const { data: capture, error: capErr } = await supabase
-      .schema('examroom')
       .from('proctor_captures')
       .select('id, exam_id, storage_path')
       .eq('id', captureId)
@@ -207,7 +213,6 @@ export async function signedUrl(req, res) {
 
     // Verify requesting user is examiner who owns the exam (or admin)
     const { data: exam } = await supabase
-      .schema('examroom')
       .from('exams')
       .select('id, owner_id')
       .eq('id', capture.exam_id)
@@ -215,7 +220,6 @@ export async function signedUrl(req, res) {
 
     if (!exam || exam.owner_id !== user.id) {
       const { data: prof } = await supabase
-        .schema('examroom')
         .from('profiles')
         .select('role')
         .eq('id', user.id)
@@ -227,8 +231,8 @@ export async function signedUrl(req, res) {
     if (!capture.storage_path)
       return res.status(410).json({ error: 'Image has been deleted.' })
 
-    // Generate signed URL (60 seconds)
-    const { data: signed, error: signErr } = await supabase.storage
+    // Generate signed URL (60 seconds) using the storage client
+    const { data: signed, error: signErr } = await supabaseStorage.storage
       .from('proctor-captures')
       .createSignedUrl(capture.storage_path, 60)
 
@@ -261,7 +265,6 @@ export async function review(req, res) {
 
     // Fetch capture
     const { data: capture, error: capErr } = await supabase
-      .schema('examroom')
       .from('proctor_captures')
       .select('*')
       .eq('id', captureId)
@@ -272,7 +275,6 @@ export async function review(req, res) {
 
     // Verify requesting user is examiner who owns the exam (or admin)
     const { data: exam, error: examErr } = await supabase
-      .schema('examroom')
       .from('exams')
       .select('id, owner_id')
       .eq('id', capture.exam_id)
@@ -283,7 +285,6 @@ export async function review(req, res) {
 
     if (exam.owner_id !== user.id) {
       const { data: prof } = await supabase
-        .schema('examroom')
         .from('profiles')
         .select('role')
         .eq('id', user.id)
@@ -300,7 +301,7 @@ export async function review(req, res) {
     if (action === 'reviewed') {
       // 1. Delete image from storage (only if path exists)
       if (capture.storage_path) {
-        const { error: delErr } = await supabase.storage
+        const { error: delErr } = await supabaseStorage.storage
           .from('proctor-captures')
           .remove([capture.storage_path])
 
@@ -314,7 +315,6 @@ export async function review(req, res) {
 
       // 2. Update capture row (only after successful storage delete)
       const { data: updated, error: updErr } = await supabase
-        .schema('examroom')
         .from('proctor_captures')
         .update({
           status:           'reviewed',
@@ -332,7 +332,7 @@ export async function review(req, res) {
         return res.status(500).json({ error: 'Database update failed: ' + updErr.message })
 
       // 3. Audit log
-      await supabase.schema('examroom').from('audit_log').insert({
+      await supabase.from('audit_log').insert({
         exam_id:     capture.exam_id,
         actor_id:    user.id,
         action:      'proctor.review',
@@ -346,7 +346,6 @@ export async function review(req, res) {
     } else {
       // action === 'escalated' — do NOT delete image
       const { data: updated, error: updErr } = await supabase
-        .schema('examroom')
         .from('proctor_captures')
         .update({
           status:        'escalated',
@@ -362,7 +361,7 @@ export async function review(req, res) {
         return res.status(500).json({ error: 'Database update failed: ' + updErr.message })
 
       // Audit log
-      await supabase.schema('examroom').from('audit_log').insert({
+      await supabase.from('audit_log').insert({
         exam_id:     capture.exam_id,
         actor_id:    user.id,
         action:      'proctor.escalate',
@@ -380,15 +379,12 @@ export async function review(req, res) {
 
 // ─── cleanup ──────────────────────────────────────────────────────────────────
 // POST /api/proctor/cleanup
-// Safety-net cleanup: deletes storage objects of pending captures older than 14 days
-// for completed (published) exams. Skips escalated captures.
 export async function cleanup(req, res) {
   try {
     const user = await verifyJwt(req)
     if (!user) return res.status(401).json({ error: 'Unauthorized.' })
 
     const { data: prof } = await supabase
-      .schema('examroom')
       .from('profiles')
       .select('role, active')
       .eq('id', user.id)
@@ -400,7 +396,6 @@ export async function cleanup(req, res) {
 
     const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
     const { data: stale, error: qErr } = await supabase
-      .schema('examroom')
       .from('proctor_captures')
       .select('id, exam_id, storage_path')
       .eq('status', 'pending')
@@ -412,7 +407,6 @@ export async function cleanup(req, res) {
     let cleaned = 0
     for (const cap of stale || []) {
       const { data: exam } = await supabase
-        .schema('examroom')
         .from('exams')
         .select('id, results_published, owner_id')
         .eq('id', cap.exam_id)
@@ -421,13 +415,12 @@ export async function cleanup(req, res) {
       if (!exam?.results_published) continue
       if (prof.role !== 'administrator' && exam.owner_id !== user.id) continue
 
-      const { error: delErr } = await supabase.storage
+      const { error: delErr } = await supabaseStorage.storage
         .from('proctor-captures')
         .remove([cap.storage_path])
       if (delErr) continue
 
       await supabase
-        .schema('examroom')
         .from('proctor_captures')
         .update({
           image_deleted_at: new Date().toISOString(),
@@ -445,3 +438,6 @@ export async function cleanup(req, res) {
     return res.status(500).json({ error: 'Internal server error.' })
   }
 }
+
+// Re-export signedUrl as named export for the route
+export { getSignedUrl as signedUrl }
