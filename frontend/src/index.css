@@ -1,0 +1,108 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --ink: #37352f;
+    --muted: #6c6a65;
+    --line: #e9e9e7;
+    --line-strong: #d3d1cb;
+    --panel: #fff;
+    --surface: #f7f7f5;
+    --soft: #efefed;
+    --primary: #37352f;
+    --error: #a62c32;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    @apply m-0 font-sans text-ink antialiased;
+    letter-spacing: -0.011em;
+  }
+
+  h1 {
+    font-size: clamp(1.65rem, 3vw, 2rem);
+    letter-spacing: -0.045em;
+    overflow-wrap: anywhere;
+    line-height: 1.16;
+    margin-bottom: 0.7rem;
+  }
+
+  h2 {
+    font-size: 1.125rem;
+    letter-spacing: -0.025em;
+    line-height: 1.16;
+    margin-bottom: 0.7rem;
+  }
+
+  h3 {
+    font-size: 1rem;
+    line-height: 1.16;
+    margin-bottom: 0.7rem;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply bg-white border border-line rounded-panel shadow-panel;
+  }
+
+  .btn-primary {
+    @apply bg-ink text-white font-semibold text-sm border border-transparent rounded-md px-[0.85rem] py-[0.48rem] cursor-pointer inline-flex items-center justify-center no-underline text-center;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #1a1917;
+  }
+  .btn-primary:disabled {
+    @apply cursor-default opacity-55;
+  }
+
+  .btn-secondary {
+    @apply bg-surface border border-line text-ink font-semibold text-sm rounded-md px-[0.85rem] py-[0.48rem] cursor-pointer inline-flex items-center justify-center no-underline text-center;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--soft);
+  }
+  .btn-secondary:disabled {
+    @apply cursor-default opacity-55;
+  }
+
+  .btn-link {
+    @apply p-0 text-ink bg-transparent underline underline-offset-2 font-semibold text-sm cursor-pointer border-0;
+  }
+
+  .form-label {
+    @apply grid gap-[0.35rem] mb-[0.9rem] font-semibold text-[0.94rem];
+  }
+
+  .form-input {
+    @apply min-w-0 w-full px-[0.72rem] py-[0.65rem] text-ink bg-white border border-line-strong rounded-md font-normal text-base;
+  }
+
+  .form-textarea {
+    @apply min-w-0 w-full px-[0.72rem] py-[0.65rem] text-ink bg-white border border-line-strong rounded-md font-normal text-base resize-y;
+  }
+
+  .form-select {
+    @apply min-w-0 w-full px-[0.72rem] py-[0.65rem] text-ink bg-white border border-line-strong rounded-md font-normal text-base;
+  }
+
+  .pill {
+    @apply inline-block bg-soft text-ink rounded px-[0.45rem] py-[0.1rem] text-[0.8rem] font-semibold;
+  }
+  .pill-available {
+    @apply bg-[#edf3ed] text-[#336548];
+  }
+  .pill-upcoming {
+    @apply bg-[#fdecc8] text-[#6c5228];
+  }
+  .pill-disabled {
+    @apply bg-soft text-muted;
+  }
+}

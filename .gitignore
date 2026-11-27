@@ -37,9 +37,7 @@ backend/keys/
 # Data volumes
 backend/shared/*/data/
 
-# Previous application is a local design reference only.
+# Old design reference
 /agent/
-/backend/
-/frontend/
 /.vercel/
 /tmp/

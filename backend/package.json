@@ -1,0 +1,20 @@
+{
+  "name": "examroom-backend",
+  "version": "1.0.0",
+  "description": "ExamRoom Express MVC backend — proxies Supabase RPC and handles email datesheets",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "nodemailer": "^6.9.14"
+  }
+}
