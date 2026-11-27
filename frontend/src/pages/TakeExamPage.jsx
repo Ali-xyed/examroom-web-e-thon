@@ -176,7 +176,7 @@ export default function TakeExamPage() {
       cleanupRef.current = integrityCapture(
         id,
         examRequest,
-        () => {},
+        () => { },
         msg => notify(msg, true)
       )
     }
@@ -188,7 +188,7 @@ export default function TakeExamPage() {
         nextPollRef.current = performance.now() + 10000
         examRequest('announcements', { examId: id })
           .then(items => setAnnouncements(items))
-          .catch(() => {})
+          .catch(() => { })
       }
 
       const secs = Math.max(
@@ -390,8 +390,15 @@ export default function TakeExamPage() {
 
   return (
     <div className="attempt-shell min-h-screen bg-white">
-      {/* Hidden video element for snapshot capture */}
-      <video ref={proctor.videoRef} autoPlay muted playsInline className="hidden" aria-hidden="true" />
+      {/* Off-screen video element for snapshot capture (avoid display:none which suspends frame decoding) */}
+      <video
+        ref={proctor.videoRef}
+        autoPlay
+        muted
+        playsInline
+        className="fixed -left-[9999px] top-0 w-[480px] h-[360px] opacity-0 pointer-events-none"
+        aria-hidden="true"
+      />
       {/* Proctor consent modal */}
       {showConsent && !submitted && !loadError && (
         <ProctorConsent
@@ -450,11 +457,10 @@ export default function TakeExamPage() {
                   ) : (
                     <div className="space-y-2">
                       {q.choices.map((choice, i) => (
-                        <label key={i} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                          (q.kind === 'multiple' ? q.selected?.includes(i) : q.choice === i)
-                            ? 'border-ink bg-soft'
-                            : 'border-line hover:bg-surface'
-                        }`}>
+                        <label key={i} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${(q.kind === 'multiple' ? q.selected?.includes(i) : q.choice === i)
+                          ? 'border-ink bg-soft'
+                          : 'border-line hover:bg-surface'
+                          }`}>
                           <input
                             type={q.kind === 'multiple' ? 'checkbox' : 'radio'}
                             name="answer"
@@ -515,13 +521,12 @@ export default function TakeExamPage() {
                   <button
                     key={q.id}
                     onClick={() => setIndex(i)}
-                    className={`w-9 h-9 rounded text-xs font-semibold border transition-colors ${
-                      i === index ? 'border-ink bg-ink text-white' :
+                    className={`w-9 h-9 rounded text-xs font-semibold border transition-colors ${i === index ? 'border-ink bg-ink text-white' :
                       isAnswered(q) && q.flagged ? 'border-[#6c5228] bg-[#fdecc8] text-[#6c5228]' :
-                      isAnswered(q) ? 'border-[#336548] bg-[#edf3ed] text-[#336548]' :
-                      q.flagged ? 'border-[#6c5228] bg-white text-[#6c5228]' :
-                      'border-line bg-white text-muted'
-                    }`}
+                        isAnswered(q) ? 'border-[#336548] bg-[#edf3ed] text-[#336548]' :
+                          q.flagged ? 'border-[#6c5228] bg-white text-[#6c5228]' :
+                            'border-line bg-white text-muted'
+                      }`}
                     aria-label={`Question ${i + 1}${isAnswered(q) ? ', answered' : ''}${q.flagged ? ', flagged' : ''}`}
                     aria-current={i === index ? 'step' : undefined}
                   >

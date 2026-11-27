@@ -40,16 +40,24 @@ export function useProctor({ examId, attemptId, enabled, apiUrl, getToken }) {
     try {
       const video = videoRef.current
       if (!video) return null
+      if (video.paused) await video.play().catch(() => {})
 
-      // Wait up to 5 s for the video to be ready (readyState >= 2 means HAVE_CURRENT_DATA)
-      if (video.readyState < 2) {
+      // Wait up to 5 s for the video to be ready (readyState >= 2 and non-zero dimensions)
+      if (video.readyState < 2 || video.videoWidth === 0) {
         await new Promise((resolve) => {
-          const onReady = () => { video.removeEventListener('canplay', onReady); resolve() }
+          const onReady = () => {
+            if (video.readyState >= 2 && video.videoWidth > 0) {
+              video.removeEventListener('canplay', onReady)
+              video.removeEventListener('loadeddata', onReady)
+              resolve()
+            }
+          }
           video.addEventListener('canplay', onReady)
+          video.addEventListener('loadeddata', onReady)
           setTimeout(resolve, 5000) // give up after 5 s
         })
       }
-      if (video.readyState < 2) return null
+      if (video.readyState < 2 || video.videoWidth === 0) return null
       const canvas = document.createElement('canvas')
       canvas.width = 480
       canvas.height = 360

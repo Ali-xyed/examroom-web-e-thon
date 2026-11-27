@@ -37,6 +37,18 @@ async function verifyJwt(req) {
   return data.user
 }
 
+// Helper: read raw JSON body when bodyParser is disabled (e.g. Vercel serverless)
+async function readJsonBody(req) {
+  if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+    return req.body
+  }
+  const chunks = []
+  for await (const chunk of req) chunks.push(chunk)
+  const raw = Buffer.concat(chunks).toString('utf8')
+  if (!raw) return {}
+  try { return JSON.parse(raw) } catch { return {} }
+}
+
 // ─── upload ──────────────────────────────────────────────────────────────────
 // POST /api/proctor/upload
 // Accepts either:
@@ -50,7 +62,8 @@ export async function upload(req, res) {
       const user = await verifyJwt(req)
       if (!user) return res.status(401).json({ error: 'Unauthorized.' })
 
-      const { captureId, attemptId, examId, flags = [], missed } = req.body || {}
+      const body = await readJsonBody(req)
+      const { captureId, attemptId, examId, flags = [], missed } = body
       if (!missed || !captureId || !attemptId || !examId)
         return res.status(400).json({ error: 'captureId, attemptId, examId, and missed=true are required.' })
 
@@ -90,102 +103,136 @@ export async function upload(req, res) {
     }
   }
 
-  multerUpload(req, res, async (err) => {
-    if (err) {
-      return res.status(400).json({
-        error: err instanceof multer.MulterError
-          ? err.message || 'File upload error.'
-          : 'Only JPEG images are accepted.',
-      })
-    }
+  return new Promise((resolve) => {
+    multerUpload(req, res, async (err) => {
+      try {
+        if (err) {
+          res.status(400).json({
+            error: err instanceof multer.MulterError
+              ? err.message || 'File upload error.'
+              : 'Only JPEG images are accepted.',
+          })
+          return resolve()
+        }
 
-    try {
-      // 1. Auth
-      const user = await verifyJwt(req)
-      if (!user) return res.status(401).json({ error: 'Unauthorized.' })
+        // 1. Auth
+        const user = await verifyJwt(req)
+        if (!user) {
+          res.status(401).json({ error: 'Unauthorized.' })
+          return resolve()
+        }
 
-      // 2. Validate required fields
-      const { captureId, attemptId, examId, flags: flagsRaw } = req.body
-      if (!captureId || !attemptId || !examId)
-        return res.status(400).json({ error: 'captureId, attemptId, and examId are required.' })
+        // 2. Validate required fields
+        const { captureId, attemptId, examId, flags: flagsRaw } = req.body
+        if (!captureId || !attemptId || !examId) {
+          res.status(400).json({ error: 'captureId, attemptId, and examId are required.' })
+          return resolve()
+        }
 
-      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      if (![captureId, attemptId, examId].every(v => uuidRe.test(v)))
-        return res.status(400).json({ error: 'Invalid UUID format.' })
+        const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        if (![captureId, attemptId, examId].every(v => uuidRe.test(v))) {
+          res.status(400).json({ error: 'Invalid UUID format.' })
+          return resolve()
+        }
 
-      let flags = []
-      if (flagsRaw) {
-        try { flags = JSON.parse(flagsRaw) } catch { flags = [] }
+        let flags = []
+        if (flagsRaw) {
+          try { flags = JSON.parse(flagsRaw) } catch { flags = [] }
+        }
+        if (!Array.isArray(flags)) flags = []
+
+        // 3. File validation
+        if (!req.file) {
+          res.status(400).json({ error: 'Image file is required.' })
+          return resolve()
+        }
+        if (req.file.mimetype !== 'image/jpeg') {
+          res.status(400).json({ error: 'Only JPEG images are accepted.' })
+          return resolve()
+        }
+        if (req.file.size > 153600) {
+          res.status(400).json({ error: 'Image exceeds the 150 KB limit.' })
+          return resolve()
+        }
+
+        // 4. Verify attempt belongs to caller, is active (allow a 60s grace window for
+        //    captures taken near deadline to avoid spurious 403s due to clock skew)
+        const graceWindow = new Date(Date.now() - 60000).toISOString()
+        const { data: attempt, error: attemptErr } = await supabase
+          .from('attempts')
+          .select('id, candidate_id, exam_id, submitted_at, deadline')
+          .eq('id', attemptId)
+          .eq('candidate_id', user.id)
+          .is('submitted_at', null)
+          .gt('deadline', graceWindow)
+          .single()
+
+        if (attemptErr || !attempt) {
+          res.status(403).json({ error: 'Active attempt not found or access denied.' })
+          return resolve()
+        }
+
+        // 5. Confirm exam proctoring mode
+        const { data: exam, error: examErr } = await supabase
+          .from('exams')
+          .select('id, proctoring_mode')
+          .eq('id', examId)
+          .single()
+
+        if (examErr || !exam) {
+          res.status(403).json({ error: 'Exam not found.' })
+          return resolve()
+        }
+
+        if (exam.proctoring_mode !== 'snapshots') {
+          res.status(403).json({ error: 'Proctoring is not enabled for this exam.' })
+          return resolve()
+        }
+
+        // 6. Upload to Supabase Storage (use the storage client, not the examroom-schema one)
+        const storagePath = `${examId}/${attemptId}/${captureId}.jpg`
+        const { error: storageErr } = await supabaseStorage.storage
+          .from('proctor-captures')
+          .upload(storagePath, req.file.buffer, {
+            contentType: 'image/jpeg',
+            upsert: true,
+          })
+
+        if (storageErr) {
+          console.error('[proctor/upload] Storage upload failed:', storageErr)
+          res.status(500).json({ error: 'Storage upload failed: ' + storageErr.message })
+          return resolve()
+        }
+
+        // 7. Upsert proctor_captures row
+        const { error: dbErr } = await supabase
+          .from('proctor_captures')
+          .upsert({
+            id:           captureId,
+            attempt_id:   attemptId,
+            exam_id:      examId,
+            candidate_id: user.id,
+            storage_path: storagePath,
+            flags,
+            status:       'pending',
+          }, { onConflict: 'id' })
+
+        if (dbErr) {
+          console.error('[proctor/upload] DB upsert failed:', dbErr)
+          res.status(500).json({ error: 'Database insert failed: ' + dbErr.message })
+          return resolve()
+        }
+
+        res.json({ ok: true })
+        return resolve()
+      } catch (e) {
+        console.error('[proctor/upload] Internal error:', e)
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Internal server error: ' + (e.message || '') })
+        }
+        return resolve()
       }
-      if (!Array.isArray(flags)) flags = []
-
-      // 3. File validation
-      if (!req.file) return res.status(400).json({ error: 'Image file is required.' })
-      if (req.file.mimetype !== 'image/jpeg')
-        return res.status(400).json({ error: 'Only JPEG images are accepted.' })
-      if (req.file.size > 153600)
-        return res.status(400).json({ error: 'Image exceeds the 150 KB limit.' })
-
-      // 4. Verify attempt belongs to caller, is active (allow a 60s grace window for
-      //    captures taken near deadline to avoid spurious 403s due to clock skew)
-      const graceWindow = new Date(Date.now() - 60000).toISOString()
-      const { data: attempt, error: attemptErr } = await supabase
-        .from('attempts')
-        .select('id, candidate_id, exam_id, submitted_at, deadline')
-        .eq('id', attemptId)
-        .eq('candidate_id', user.id)
-        .is('submitted_at', null)
-        .gt('deadline', graceWindow)
-        .single()
-
-      if (attemptErr || !attempt)
-        return res.status(403).json({ error: 'Active attempt not found or access denied.' })
-
-      // 5. Confirm exam proctoring mode
-      const { data: exam, error: examErr } = await supabase
-        .from('exams')
-        .select('id, proctoring_mode')
-        .eq('id', examId)
-        .single()
-
-      if (examErr || !exam)
-        return res.status(403).json({ error: 'Exam not found.' })
-
-      if (exam.proctoring_mode !== 'snapshots')
-        return res.status(403).json({ error: 'Proctoring is not enabled for this exam.' })
-
-      // 6. Upload to Supabase Storage (use the storage client, not the examroom-schema one)
-      const storagePath = `${examId}/${attemptId}/${captureId}.jpg`
-      const { error: storageErr } = await supabaseStorage.storage
-        .from('proctor-captures')
-        .upload(storagePath, req.file.buffer, {
-          contentType: 'image/jpeg',
-          upsert: true,
-        })
-
-      if (storageErr)
-        return res.status(500).json({ error: 'Storage upload failed: ' + storageErr.message })
-
-      // 7. Upsert proctor_captures row
-      const { error: dbErr } = await supabase
-        .from('proctor_captures')
-        .upsert({
-          id:           captureId,
-          attempt_id:   attemptId,
-          exam_id:      examId,
-          candidate_id: user.id,
-          storage_path: storagePath,
-          flags,
-          status:       'pending',
-        }, { onConflict: 'id' })
-
-      if (dbErr)
-        return res.status(500).json({ error: 'Database insert failed: ' + dbErr.message })
-
-      return res.json({ ok: true })
-    } catch (e) {
-      return res.status(500).json({ error: 'Internal server error: ' + (e.message || '') })
-    }
+    })
   })
 }
 
