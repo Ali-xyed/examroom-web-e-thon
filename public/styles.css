@@ -43,7 +43,8 @@ button:disabled { cursor: default; opacity: .55; }
 .account-label { display: grid; line-height: 1.3; text-align: right; }
 .account-label strong { font-size: .93rem; }
 .account-label span { color: var(--muted); font-size: .85rem; }
-main { width: min(1080px, 100% - 3rem); margin: 0 auto; padding: 2.25rem 0 4rem; outline: none; }
+main { width: min(1080px, 100% - 3rem); margin: 0 auto; padding: 2.25rem 0 4rem; }
+main:focus { outline: none; }
 .skip { position: absolute; top: .5rem; left: .5rem; z-index: 3; transform: translateY(-160%); background: white; padding: .65rem; }
 .skip:focus { transform: none; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: .625rem; box-shadow: var(--shadow); }
